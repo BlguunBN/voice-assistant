@@ -1,0 +1,1 @@
+"""Local Mongolian voice assistant."""

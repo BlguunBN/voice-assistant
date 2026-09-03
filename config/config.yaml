@@ -1,0 +1,18 @@
+system:
+  language: mn
+
+storage:
+  root: 'D:/AI'
+  project_root: 'D:/AI/voice-assistant'
+  model_root: 'D:/AI/models'
+  recordings: 'D:/AI/recordings'
+  huggingface_home: 'D:/AI/huggingface'
+  huggingface_cache: 'D:/AI/huggingface/hub'
+
+stt:
+  model: 'Blgn94/whisper-small-mn-v3'
+  local_path: 'D:/AI/models/stt/whisper-small-mn-v3'
+  device: cuda
+  fallback_device: cpu
+  sample_rate: 16000
+  max_new_tokens: 256
