@@ -6,7 +6,14 @@ from pathlib import Path
 import sys
 
 from src.agent import EchoAgent
-from src.audio import AudioDeviceError, AudioDeviceManager, AudioPlayback, AudioRecorder
+from src.audio import (
+    AudioDeviceError,
+    AudioDeviceManager,
+    AudioGate,
+    AudioPlayback,
+    AudioRecorder,
+    VADConfig,
+)
 from src.core.config import AppConfig, ConfigError, load_config
 from src.pipeline import EchoPipeline
 from src.stt.engine import STTError, STTEngine
@@ -54,6 +61,7 @@ def _print_audio_devices(config: AppConfig) -> tuple[AudioDeviceManager, object,
     print(f"  selected output: {selected_output.label()}")
     print(f"  sample rate: {config.audio_sample_rate} Hz")
     print(f"  push-to-talk: {config.push_to_talk_hotkey}")
+    print(f"  VAD: {'enabled' if config.vad_enabled else 'disabled'}")
     print("  detected devices:")
     for device in devices:
         print(f"    {device.label()}")
@@ -132,55 +140,69 @@ def _pipeline(config: AppConfig) -> tuple[EchoPipeline, STTEngine, TTSEngine, ob
     selected_output = manager.selected("output")
     stt = STTEngine(config)
     tts = TTSEngine(config)
+    gate = AudioGate()
+    vad = (
+        VADConfig(
+            start_threshold=config.vad_start_threshold,
+            stop_threshold=config.vad_stop_threshold,
+            silence_seconds=config.vad_silence_seconds,
+            min_speech_seconds=config.vad_min_speech_seconds,
+        )
+        if config.vad_enabled
+        else None
+    )
     recorder = AudioRecorder(
         device=selected_input,
         sample_rate=config.audio_sample_rate,
         max_seconds=config.audio_max_seconds,
         blocksize=config.audio_blocksize,
         hotkey=config.push_to_talk_hotkey,
+        vad=vad,
+        gate=gate,
     )
     playback = AudioPlayback(config, selected_output, tts=tts)
-    return EchoPipeline(recorder, stt, EchoAgent(), playback), stt, tts, selected_input, selected_output
+    pipeline = EchoPipeline(recorder, stt, EchoAgent(), playback, gate=gate)
+    return pipeline, stt, tts, selected_input, selected_output
 
 
-def listen(config: AppConfig) -> int:
+def listen(config: AppConfig, turns: int) -> int:
     pipeline, stt, tts, selected_input, selected_output = _pipeline(config)
     try:
         print(f"Selected input device: {selected_input.label()}")
         print(f"Selected output device: {selected_output.label()}")
-        recording, transcript, transitions = pipeline.listen_once()
-        print(f"Recognized text: {transcript}")
-        print(f"Recording duration: {recording.duration_seconds:.3f} s")
-        print("State transitions: " + " -> ".join(state.value for state in transitions))
+        for turn_index in range(1, turns + 1):
+            recording, transcript, transitions = pipeline.listen_once()
+            print(f"Turn {turn_index} recognized text: {transcript}")
+            print(f"Recording duration: {recording.duration_seconds:.3f} s")
+            print("State transitions: " + " -> ".join(state.value for state in transitions))
         return 0
     finally:
-        stt.unload()
-        tts.unload()
+        pipeline.shutdown()
 
 
-def echo(config: AppConfig, speaker_id: str | None) -> int:
+def echo(config: AppConfig, speaker_id: str | None, turns: int) -> int:
     pipeline, stt, tts, selected_input, selected_output = _pipeline(config)
     try:
         print(f"Selected input device: {selected_input.label()}")
         print(f"Selected output device: {selected_output.label()}")
-        turn = pipeline.echo_once(speaker_id=speaker_id)
-        print(f"Recognized text: {turn.transcript}")
-        print(f"Echo response: {turn.response}")
-        print("TTS result: played")
-        print("State transitions: " + " -> ".join(state.value for state in turn.state_transitions))
-        if turn.stt_latency_seconds is not None:
-            print(f"STT latency: {turn.stt_latency_seconds:.3f} s")
-        if turn.tts_latency_seconds is not None:
-            print(f"TTS latency: {turn.tts_latency_seconds:.3f} s")
-        if turn.end_of_speech_to_audio_start_seconds is not None:
-            print(
-                "Total end-of-speech -> audio-start latency: "
-                f"{turn.end_of_speech_to_audio_start_seconds:.3f} s"
-            )
+        for turn_index in range(1, turns + 1):
+            turn = pipeline.echo_once(speaker_id=speaker_id)
+            print(f"Turn {turn_index} recognized text: {turn.transcript}")
+            print(f"Echo response: {turn.response}")
+            print("TTS result: played")
+            print("State transitions: " + " -> ".join(state.value for state in turn.state_transitions))
+            if turn.stt_latency_seconds is not None:
+                print(f"STT latency: {turn.stt_latency_seconds:.3f} s")
+            if turn.tts_latency_seconds is not None:
+                print(f"TTS latency: {turn.tts_latency_seconds:.3f} s")
+            if turn.end_of_speech_to_audio_start_seconds is not None:
+                print(
+                    "Total end-of-speech -> audio-start latency: "
+                    f"{turn.end_of_speech_to_audio_start_seconds:.3f} s"
+                )
         return 0
     finally:
-        stt.unload()
-        tts.unload()
+        pipeline.shutdown()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -199,9 +221,11 @@ def build_parser() -> argparse.ArgumentParser:
     speak_parser.add_argument("--speaker", dest="speaker_id", default=None)
     speak_parser.add_argument("--output", dest="output_path", default=None)
     speak_parser.add_argument("text", help="Mongolian text to speak")
-    listen_parser = subparsers.add_parser("listen", help="Record and transcribe one push-to-talk turn")
-    echo_parser = subparsers.add_parser("echo", help="Run one push-to-talk STT-to-TTS echo turn")
+    listen_parser = subparsers.add_parser("listen", help="Record and transcribe push-to-talk turns")
+    listen_parser.add_argument("--turns", type=int, default=1)
+    echo_parser = subparsers.add_parser("echo", help="Run push-to-talk STT-to-TTS echo turns")
     echo_parser.add_argument("--speaker", dest="speaker_id", default=None)
+    echo_parser.add_argument("--turns", type=int, default=1)
     return parser
 
 
@@ -220,9 +244,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "speak":
             return speak(config, args.text, args.speaker_id, args.output_path)
         if args.command == "listen":
-            return listen(config)
+            if args.turns < 1:
+                raise ConfigError("listen --turns must be positive")
+            return listen(config, args.turns)
         if args.command == "echo":
-            return echo(config, args.speaker_id)
+            if args.turns < 1:
+                raise ConfigError("echo --turns must be positive")
+            return echo(config, args.speaker_id, args.turns)
         raise ConfigError(f"Unsupported command: {args.command}")
     except (AudioDeviceError, ConfigError, STTError, TTSError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

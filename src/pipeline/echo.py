@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 from enum import StrEnum
+from threading import RLock
 from typing import Any
 
 from src.agent.echo import EchoAgent
 from src.audio.capture import AudioRecorder, Recording
+from src.audio.gate import AudioGate
 from src.audio.playback import SpeakerPlayback
 from src.stt.engine import STTEngine
+from src.text.normalize import TextNormalizer
 
 
 class AssistantState(StrEnum):
@@ -32,7 +36,7 @@ class EchoTurn:
 
 
 class EchoPipeline:
-    """Run one-shot push-to-talk STT → EchoAgent → TTS turns."""
+    """Run one-shot or repeated push-to-talk STT → EchoAgent → TTS turns."""
 
     _allowed_transitions = {
         AssistantState.IDLE: {AssistantState.LISTENING},
@@ -48,13 +52,18 @@ class EchoPipeline:
         stt: STTEngine,
         agent: EchoAgent,
         playback: SpeakerPlayback,
+        gate: AudioGate | None = None,
+        normalizer: TextNormalizer | None = None,
     ) -> None:
         self.recorder = recorder
         self.stt = stt
         self.agent = agent
         self.playback = playback
+        self.gate = gate
+        self.normalizer = normalizer or TextNormalizer()
         self.state = AssistantState.IDLE
         self.transitions: list[AssistantState] = [self.state]
+        self._turn_lock = RLock()
 
     def _transition(self, next_state: AssistantState) -> None:
         if next_state not in self._allowed_transitions[self.state]:
@@ -70,31 +79,38 @@ class EchoPipeline:
     def _capture_and_transcribe(self) -> tuple[Recording, str]:
         self._transition(AssistantState.LISTENING)
         try:
-            recording = self.recorder.record_push_to_talk()
+            recording = self.recorder.record()
             self._transition(AssistantState.TRANSCRIBING)
-            transcript = self.stt.transcribe(recording.samples)
+            transcript = self.normalizer.normalize(self.stt.transcribe(recording.samples))
+            if not transcript:
+                raise RuntimeError("No speech recognized; transcription result was empty")
             return recording, transcript
         except Exception:
             self._reset_after_error()
             raise
 
-    def listen_once(self) -> tuple[Recording, str, tuple[AssistantState, ...]]:
-        """Capture and transcribe one turn without speaking a response."""
+    def _listen_once(self) -> tuple[Recording, str, tuple[AssistantState, ...]]:
         self.transitions = [AssistantState.IDLE]
         recording, transcript = self._capture_and_transcribe()
         self._transition(AssistantState.IDLE)
         return recording, transcript, tuple(self.transitions)
 
-    def echo_once(self, speaker_id: str | None = None) -> EchoTurn:
-        """Capture, transcribe, echo, synthesize, play, and return to IDLE."""
+    def listen_once(self) -> tuple[Recording, str, tuple[AssistantState, ...]]:
+        """Capture and transcribe one turn without speaking a response."""
+        with self._turn_lock:
+            return self._listen_once()
+
+    def _echo_once(self, speaker_id: str | None = None) -> EchoTurn:
         self.transitions = [AssistantState.IDLE]
         recording, transcript = self._capture_and_transcribe()
         try:
             self._transition(AssistantState.THINKING)
-            response = self.agent.respond(transcript)
+            response = self.normalizer.normalize(self.agent.respond(transcript))
             self._transition(AssistantState.SPEAKING)
             audio_start_before = getattr(self.playback, "last_audio_started_at", None)
-            self.playback.speak(response, speaker_id=speaker_id)
+            playback_gate = self.gate.speaking() if self.gate is not None else nullcontext()
+            with playback_gate:
+                self.playback.speak(response, speaker_id=speaker_id)
             audio_start_at = getattr(self.playback, "last_audio_started_at", None)
             if audio_start_at is None:
                 audio_start_at = audio_start_before
@@ -118,3 +134,17 @@ class EchoPipeline:
         except Exception:
             self._reset_after_error()
             raise
+
+    def echo_once(self, speaker_id: str | None = None) -> EchoTurn:
+        """Capture, transcribe, echo, synthesize, play, and return to IDLE."""
+        with self._turn_lock:
+            return self._echo_once(speaker_id=speaker_id)
+
+    def shutdown(self) -> None:
+        """Return to IDLE and release resident STT/TTS resources."""
+        with self._turn_lock:
+            self._reset_after_error()
+            self.stt.unload()
+            tts_engine = getattr(self.playback, "tts", None)
+            if tts_engine is not None:
+                tts_engine.unload()

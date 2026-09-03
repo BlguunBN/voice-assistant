@@ -108,6 +108,25 @@ class AppConfig:
     def push_to_talk_hotkey(self) -> str:
         return str(self.data["audio"]["push_to_talk_hotkey"]).lower()
 
+    @property
+    def vad_enabled(self) -> bool:
+        return bool(self.data["vad"]["enabled"])
+
+    @property
+    def vad_start_threshold(self) -> float:
+        return float(self.data["vad"]["start_threshold"])
+
+    @property
+    def vad_stop_threshold(self) -> float:
+        return float(self.data["vad"]["stop_threshold"])
+
+    @property
+    def vad_silence_seconds(self) -> float:
+        return float(self.data["vad"]["silence_seconds"])
+
+    @property
+    def vad_min_speech_seconds(self) -> float:
+        return float(self.data["vad"]["min_speech_seconds"])
     @staticmethod
     def _device_value(value: Any, name: str) -> int | str | None:
         if value is None:
@@ -151,7 +170,14 @@ class AppConfig:
             raise ConfigError("audio.max_seconds must be positive")
         if self.push_to_talk_hotkey != "space":
             raise ConfigError("audio.push_to_talk_hotkey must be 'space' for Stage 3")
-
+        if self.vad_start_threshold <= 0 or self.vad_stop_threshold <= 0:
+            raise ConfigError("vad thresholds must be positive")
+        if self.vad_stop_threshold > self.vad_start_threshold:
+            raise ConfigError("vad.stop_threshold must not exceed vad.start_threshold")
+        if self.vad_silence_seconds <= 0:
+            raise ConfigError("vad.silence_seconds must be positive")
+        if self.vad_min_speech_seconds <= 0:
+            raise ConfigError("vad.min_speech_seconds must be positive")
     def ensure_runtime_directories(self) -> None:
         for directory in (
             self.project_root,
