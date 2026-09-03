@@ -81,7 +81,7 @@ class STTEngine:
             self._model = WhisperForConditionalGeneration.from_pretrained(
                 str(self.model_path),
                 local_files_only=True,
-                torch_dtype=dtype,
+                dtype=dtype,
             )
             self._model.to(self.device)
             self._model.eval()

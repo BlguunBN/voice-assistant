@@ -127,6 +127,24 @@ class AppConfig:
     @property
     def vad_min_speech_seconds(self) -> float:
         return float(self.data["vad"]["min_speech_seconds"])
+    @property
+    def api_host(self) -> str:
+        return str(self.data["api"]["host"]).strip()
+
+    @property
+    def api_port(self) -> int:
+        return int(self.data["api"]["port"])
+
+    @property
+    def api_max_upload_bytes(self) -> int:
+        return int(self.data["api"]["max_upload_bytes"])
+    @property
+    def logging_enabled(self) -> bool:
+        return bool(self.data["logging"]["enabled"])
+
+    @property
+    def save_recordings(self) -> bool:
+        return bool(self.data["logging"]["save_recordings"])
     @staticmethod
     def _device_value(value: Any, name: str) -> int | str | None:
         if value is None:
@@ -178,6 +196,12 @@ class AppConfig:
             raise ConfigError("vad.silence_seconds must be positive")
         if self.vad_min_speech_seconds <= 0:
             raise ConfigError("vad.min_speech_seconds must be positive")
+        if self.api_host not in {"127.0.0.1", "localhost", "::1"}:
+            raise ConfigError("api.host must bind to localhost only")
+        if not 1 <= self.api_port <= 65_535:
+            raise ConfigError("api.port must be between 1 and 65535")
+        if self.api_max_upload_bytes < 1:
+            raise ConfigError("api.max_upload_bytes must be positive")
     def ensure_runtime_directories(self) -> None:
         for directory in (
             self.project_root,

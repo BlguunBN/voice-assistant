@@ -13,3 +13,6 @@ soundfile>=0.13,<1
 sounddevice>=0.5,<1
 psutil>=6.0,<8
 pytest>=8.0,<10
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-multipart>=0.0.9,<1

@@ -37,3 +37,10 @@ vad:
   stop_threshold: 0.008
   silence_seconds: 0.8
   min_speech_seconds: 0.25
+api:
+  host: '127.0.0.1'
+  port: 8000
+  max_upload_bytes: 26214400
+logging:
+  enabled: true
+  save_recordings: false
