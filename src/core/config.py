@@ -14,7 +14,7 @@ class ConfigError(ValueError):
 
 @dataclass(frozen=True)
 class AppConfig:
-    """Typed access to the configuration needed by the Stage 1 STT service."""
+    """Typed access to the local Mongolian voice assistant configuration."""
 
     path: Path
     data: dict[str, Any]
@@ -66,6 +66,7 @@ class AppConfig:
     @property
     def stt_max_new_tokens(self) -> int:
         return int(self.data["stt"]["max_new_tokens"])
+
     @property
     def tts_model_id(self) -> str:
         return str(self.data["tts"]["model"])
@@ -82,6 +83,42 @@ class AppConfig:
     def tts_speaker_id(self) -> str | None:
         value = self.data["tts"].get("speaker_id")
         return str(value) if value is not None else None
+
+    @property
+    def audio_input_device(self) -> int | str | None:
+        return self._device_value(self.data["audio"].get("input_device"), "audio.input_device")
+
+    @property
+    def audio_output_device(self) -> int | str | None:
+        return self._device_value(self.data["audio"].get("output_device"), "audio.output_device")
+
+    @property
+    def audio_sample_rate(self) -> int:
+        return int(self.data["audio"]["sample_rate"])
+
+    @property
+    def audio_blocksize(self) -> int:
+        return int(self.data["audio"]["blocksize"])
+
+    @property
+    def audio_max_seconds(self) -> float:
+        return float(self.data["audio"]["max_seconds"])
+
+    @property
+    def push_to_talk_hotkey(self) -> str:
+        return str(self.data["audio"]["push_to_talk_hotkey"]).lower()
+
+    @staticmethod
+    def _device_value(value: Any, name: str) -> int | str | None:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            raise ConfigError(f"{name} must be an integer index, name, or null")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        raise ConfigError(f"{name} must be an integer index, name, or null")
 
     def _path(self, section: str, key: str) -> Path:
         value = self.data[section][key]
@@ -104,6 +141,16 @@ class AppConfig:
             raise ConfigError("tts.model must be non-empty")
         if self.tts_device != "cpu":
             raise ConfigError("tts.device must be 'cpu' for Stage 2")
+        if self.audio_sample_rate != self.stt_sample_rate:
+            raise ConfigError("audio.sample_rate must match stt.sample_rate")
+        if self.audio_sample_rate != 16_000:
+            raise ConfigError("audio.sample_rate must be 16000 Hz")
+        if self.audio_blocksize < 1:
+            raise ConfigError("audio.blocksize must be positive")
+        if self.audio_max_seconds <= 0:
+            raise ConfigError("audio.max_seconds must be positive")
+        if self.push_to_talk_hotkey != "space":
+            raise ConfigError("audio.push_to_talk_hotkey must be 'space' for Stage 3")
 
     def ensure_runtime_directories(self) -> None:
         for directory in (

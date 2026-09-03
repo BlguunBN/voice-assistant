@@ -10,5 +10,6 @@ safetensors>=0.5,<1
 numpy>=2.0,<3
 PyYAML>=6.0,<7
 soundfile>=0.13,<1
+sounddevice>=0.5,<1
 psutil>=6.0,<8
 pytest>=8.0,<10

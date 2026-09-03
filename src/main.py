@@ -5,7 +5,10 @@ import logging
 from pathlib import Path
 import sys
 
+from src.agent import EchoAgent
+from src.audio import AudioDeviceError, AudioDeviceManager, AudioPlayback, AudioRecorder
 from src.core.config import AppConfig, ConfigError, load_config
+from src.pipeline import EchoPipeline
 from src.stt.engine import STTError, STTEngine
 from src.tts.engine import TTSError, TTSEngine
 
@@ -36,6 +39,27 @@ def _torch_status() -> tuple[str, str, int | None]:
     return torch.__version__, torch.cuda.get_device_name(0), int(properties.total_memory)
 
 
+def _audio_manager(config: AppConfig) -> AudioDeviceManager:
+    return AudioDeviceManager(
+        input_device=config.audio_input_device,
+        output_device=config.audio_output_device,
+    )
+
+
+def _print_audio_devices(config: AppConfig) -> tuple[AudioDeviceManager, object, object]:
+    manager = _audio_manager(config)
+    selected_input, selected_output, devices = manager.describe()
+    print("Audio")
+    print(f"  selected input: {selected_input.label()}")
+    print(f"  selected output: {selected_output.label()}")
+    print(f"  sample rate: {config.audio_sample_rate} Hz")
+    print(f"  push-to-talk: {config.push_to_talk_hotkey}")
+    print("  detected devices:")
+    for device in devices:
+        print(f"    {device.label()}")
+    return manager, selected_input, selected_output
+
+
 def print_status(config: AppConfig) -> None:
     torch_version, gpu_name, vram = _torch_status()
     stt_path = config.stt_local_path
@@ -59,6 +83,7 @@ def print_status(config: AppConfig) -> None:
     if vram is not None:
         print(f"  VRAM: {vram / (1024**3):.2f} GiB")
     print(f"Hugging Face cache: {config.huggingface_cache}")
+    _print_audio_devices(config)
 
 
 def transcribe(config: AppConfig, audio_path: str) -> int:
@@ -101,6 +126,63 @@ def speak(config: AppConfig, text: str, speaker_id: str | None, output_path: str
         engine.unload()
 
 
+def _pipeline(config: AppConfig) -> tuple[EchoPipeline, STTEngine, TTSEngine, object, object]:
+    manager = _audio_manager(config)
+    selected_input = manager.selected("input")
+    selected_output = manager.selected("output")
+    stt = STTEngine(config)
+    tts = TTSEngine(config)
+    recorder = AudioRecorder(
+        device=selected_input,
+        sample_rate=config.audio_sample_rate,
+        max_seconds=config.audio_max_seconds,
+        blocksize=config.audio_blocksize,
+        hotkey=config.push_to_talk_hotkey,
+    )
+    playback = AudioPlayback(config, selected_output, tts=tts)
+    return EchoPipeline(recorder, stt, EchoAgent(), playback), stt, tts, selected_input, selected_output
+
+
+def listen(config: AppConfig) -> int:
+    pipeline, stt, tts, selected_input, selected_output = _pipeline(config)
+    try:
+        print(f"Selected input device: {selected_input.label()}")
+        print(f"Selected output device: {selected_output.label()}")
+        recording, transcript, transitions = pipeline.listen_once()
+        print(f"Recognized text: {transcript}")
+        print(f"Recording duration: {recording.duration_seconds:.3f} s")
+        print("State transitions: " + " -> ".join(state.value for state in transitions))
+        return 0
+    finally:
+        stt.unload()
+        tts.unload()
+
+
+def echo(config: AppConfig, speaker_id: str | None) -> int:
+    pipeline, stt, tts, selected_input, selected_output = _pipeline(config)
+    try:
+        print(f"Selected input device: {selected_input.label()}")
+        print(f"Selected output device: {selected_output.label()}")
+        turn = pipeline.echo_once(speaker_id=speaker_id)
+        print(f"Recognized text: {turn.transcript}")
+        print(f"Echo response: {turn.response}")
+        print("TTS result: played")
+        print("State transitions: " + " -> ".join(state.value for state in turn.state_transitions))
+        if turn.stt_latency_seconds is not None:
+            print(f"STT latency: {turn.stt_latency_seconds:.3f} s")
+        if turn.tts_latency_seconds is not None:
+            print(f"TTS latency: {turn.tts_latency_seconds:.3f} s")
+        if turn.end_of_speech_to_audio_start_seconds is not None:
+            print(
+                "Total end-of-speech -> audio-start latency: "
+                f"{turn.end_of_speech_to_audio_start_seconds:.3f} s"
+            )
+        return 0
+    finally:
+        stt.unload()
+        tts.unload()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local Mongolian voice assistant")
     parser.add_argument(
@@ -109,7 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to config YAML (defaults to config/config.yaml)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("status", help="Show local STT, TTS, and hardware status")
+    subparsers.add_parser("status", help="Show local models, audio devices, and hardware status")
     subparsers.add_parser("voices", help="List speakers discovered from the TTS model")
     transcribe_parser = subparsers.add_parser("transcribe", help="Transcribe a WAV/audio file")
     transcribe_parser.add_argument("audio", help="Path to the audio file")
@@ -117,6 +199,9 @@ def build_parser() -> argparse.ArgumentParser:
     speak_parser.add_argument("--speaker", dest="speaker_id", default=None)
     speak_parser.add_argument("--output", dest="output_path", default=None)
     speak_parser.add_argument("text", help="Mongolian text to speak")
+    listen_parser = subparsers.add_parser("listen", help="Record and transcribe one push-to-talk turn")
+    echo_parser = subparsers.add_parser("echo", help="Run one push-to-talk STT-to-TTS echo turn")
+    echo_parser.add_argument("--speaker", dest="speaker_id", default=None)
     return parser
 
 
@@ -134,8 +219,12 @@ def main(argv: list[str] | None = None) -> int:
             return voices(config)
         if args.command == "speak":
             return speak(config, args.text, args.speaker_id, args.output_path)
+        if args.command == "listen":
+            return listen(config)
+        if args.command == "echo":
+            return echo(config, args.speaker_id)
         raise ConfigError(f"Unsupported command: {args.command}")
-    except (ConfigError, STTError, TTSError) as exc:
+    except (AudioDeviceError, ConfigError, STTError, TTSError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

@@ -16,8 +16,17 @@ stt:
   fallback_device: cpu
   sample_rate: 16000
   max_new_tokens: 256
+
 tts:
   model: 'Bokhbat/mongolian-vits-tts'
   local_path: 'D:/AI/models/tts/mongolian-vits-tts'
   device: cpu
   speaker_id: null
+
+audio:
+  input_device: null
+  output_device: null
+  sample_rate: 16000
+  blocksize: 512
+  max_seconds: 15
+  push_to_talk_hotkey: space
