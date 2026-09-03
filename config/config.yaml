@@ -16,3 +16,8 @@ stt:
   fallback_device: cpu
   sample_rate: 16000
   max_new_tokens: 256
+tts:
+  model: 'Bokhbat/mongolian-vits-tts'
+  local_path: 'D:/AI/models/tts/mongolian-vits-tts'
+  device: cpu
+  speaker_id: null

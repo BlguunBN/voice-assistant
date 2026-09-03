@@ -10,9 +10,10 @@ from src.stt.engine import STTEngine, STTError
 
 
 class FakeProcessor:
-    def __call__(self, audio, *, sampling_rate, return_tensors):
+    def __call__(self, audio, *, sampling_rate, return_tensors, return_attention_mask):
         assert sampling_rate == 16_000
         assert return_tensors == "pt"
+        assert return_attention_mask is True
         import torch
 
         return {"input_features": torch.zeros((1, 80, 3000))}

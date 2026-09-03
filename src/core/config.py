@@ -66,6 +66,22 @@ class AppConfig:
     @property
     def stt_max_new_tokens(self) -> int:
         return int(self.data["stt"]["max_new_tokens"])
+    @property
+    def tts_model_id(self) -> str:
+        return str(self.data["tts"]["model"])
+
+    @property
+    def tts_local_path(self) -> Path:
+        return self._path("tts", "local_path")
+
+    @property
+    def tts_device(self) -> str:
+        return str(self.data["tts"]["device"]).lower()
+
+    @property
+    def tts_speaker_id(self) -> str | None:
+        value = self.data["tts"].get("speaker_id")
+        return str(value) if value is not None else None
 
     def _path(self, section: str, key: str) -> Path:
         value = self.data[section][key]
@@ -84,6 +100,10 @@ class AppConfig:
             raise ConfigError("stt.sample_rate must be 16000 Hz")
         if self.stt_max_new_tokens < 1:
             raise ConfigError("stt.max_new_tokens must be positive")
+        if not self.tts_model_id.strip():
+            raise ConfigError("tts.model must be non-empty")
+        if self.tts_device != "cpu":
+            raise ConfigError("tts.device must be 'cpu' for Stage 2")
 
     def ensure_runtime_directories(self) -> None:
         for directory in (

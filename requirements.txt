@@ -1,8 +1,11 @@
 # Runtime dependencies for the local Mongolian voice assistant.
 --extra-index-url https://download.pytorch.org/whl/cu128
 torch==2.11.0+cu128
-transformers>=4.51,<6
-huggingface-hub>=0.30,<2
+torchaudio==2.11.0+cu128
+transformers==4.57.3
+huggingface-hub==0.36.2
+coqui-tts==0.27.5
+torchcodec==0.16.0
 safetensors>=0.5,<1
 numpy>=2.0,<3
 PyYAML>=6.0,<7

@@ -76,6 +76,7 @@ class STTEngine:
             self._processor = AutoProcessor.from_pretrained(
                 str(self.model_path),
                 local_files_only=True,
+                extra_special_tokens={},
             )
             self._model = WhisperForConditionalGeneration.from_pretrained(
                 str(self.model_path),
@@ -170,6 +171,7 @@ class STTEngine:
             audio,
             sampling_rate=self.config.stt_sample_rate,
             return_tensors="pt",
+            return_attention_mask=True,
         )
         model_inputs = self._move_inputs(
             inputs, self.device, getattr(self._model, "dtype", None)
