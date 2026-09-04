@@ -18,3 +18,4 @@ frontend/*.log
 .env
 .env.*
 !.env.example
+.superpowers/
