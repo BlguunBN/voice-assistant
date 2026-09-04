@@ -92,3 +92,79 @@ def test_clipboard_injector_restores_previous_text(monkeypatch):
 
     assert clipboard["value"] == "old"
     assert events == [(0x11, 0), (0x56, 0), (0x56, 2), (0x11, 2)]
+def test_clipboard_injector_restores_captured_window_before_paste(monkeypatch):
+    import ctypes
+
+    clipboard = {"value": "old"}
+    events: list[tuple[str, int]] = []
+
+    class FakeUser32:
+        foreground = 7
+
+        def GetForegroundWindow(self):
+            return self.foreground
+
+        def SetForegroundWindow(self, target_window):
+            events.append(("focus", target_window))
+            self.foreground = target_window
+            return 1
+
+        def keybd_event(self, key, scan_code, flags, extra):
+            del scan_code, extra
+            events.append(("key", key if flags == 0 else -key))
+
+    user32 = FakeUser32()
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(user32=user32), raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "pyperclip",
+        SimpleNamespace(paste=lambda: clipboard["value"], copy=lambda value: clipboard.update(value=value)),
+    )
+
+    user32.foreground = 99
+    ClipboardTextInjector(paste_delay_seconds=0).paste("new text", target_window=7)
+
+    assert clipboard["value"] == "old"
+    assert events[0] == ("focus", 7)
+    assert events[1:] == [("key", 17), ("key", 86), ("key", -86), ("key", -17)]
+
+
+def test_desktop_loop_accepts_two_consecutive_recordings():
+    config = load_config()
+    engine = object.__new__(DesktopDictation)
+    engine.config = config
+    engine._stop = dictation_module.threading.Event()
+    engine._set_status = lambda *_args, **_kwargs: None
+    targets = iter((101, 202))
+    focused_windows: list[int] = []
+
+    class FakeInjector:
+        def focused_window(self):
+            target = next(targets)
+            focused_windows.append(target)
+            return target
+
+    class FakeRecorder:
+        def __init__(self):
+            self.calls = 0
+
+        def record(self, on_started=None):
+            self.calls += 1
+            if on_started is not None:
+                on_started()
+            return f"recording-{self.calls}"
+
+    processed: list[tuple[str, int]] = []
+    engine.injector = FakeInjector()
+    engine.recorder = FakeRecorder()
+
+    def process(recording, *, target_window=None):
+        processed.append((recording, target_window))
+        if len(processed) == 2:
+            engine._stop.set()
+
+    engine._process_recording = process
+    engine._loop()
+
+    assert focused_windows == [101, 202]
+    assert processed == [("recording-1", 101), ("recording-2", 202)]

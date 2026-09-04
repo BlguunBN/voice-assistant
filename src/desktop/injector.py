@@ -27,17 +27,24 @@ class ClipboardTextInjector:
             raise TextInjectionError("Text injection requires Windows")
         return windll.user32
 
-    def paste(self, text: str) -> None:
-        """Paste plain text into the window that was focused at invocation time."""
+    def focused_window(self) -> int:
+        """Return the foreground window that should receive the next paste."""
+        user32 = self._user32()
+        target_window = user32.GetForegroundWindow()
+        if not target_window:
+            raise TextInjectionError("No foreground window is available")
+        return int(target_window)
+
+    def paste(self, text: str, *, target_window: int | None = None) -> None:
+        """Paste plain text into the captured target window."""
         if not text or not text.strip():
             raise TextInjectionError("Cannot inject empty text")
 
         import pyperclip
 
         user32 = self._user32()
-        target_window = user32.GetForegroundWindow()
-        if not target_window:
-            raise TextInjectionError("No foreground window is available")
+        if target_window is None:
+            target_window = self.focused_window()
 
         previous_text: str | None
         try:
@@ -49,7 +56,12 @@ class ClipboardTextInjector:
             pyperclip.copy(text)
             time.sleep(self.paste_delay_seconds)
             if user32.GetForegroundWindow() != target_window:
-                raise TextInjectionError("Focused window changed before text injection")
+                set_foreground_window = getattr(user32, "SetForegroundWindow", None)
+                if set_foreground_window is None or not set_foreground_window(target_window):
+                    raise TextInjectionError("The captured target window is no longer available")
+                time.sleep(self.paste_delay_seconds)
+            if user32.GetForegroundWindow() != target_window:
+                raise TextInjectionError("The captured target window could not be focused")
             self._send_ctrl_v(user32)
             time.sleep(self.paste_delay_seconds)
         finally:
