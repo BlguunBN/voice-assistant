@@ -220,7 +220,7 @@ class AppConfig:
     def desktop_hotkey(self) -> str:
         section = self.data.get("desktop", {})
         value = section.get("hotkey") if isinstance(section, dict) else None
-        return str(value or "ctrl+shift+space").strip().lower()
+        return str(value or "ctrl+alt").strip().lower()
 
     @property
     def desktop_language(self) -> str:

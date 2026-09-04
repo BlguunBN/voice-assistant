@@ -1,6 +1,6 @@
 # Mongolian Voice Assistant
 
-A local Windows voice assistant with Mongolian and English speech-to-text, text-to-speech, an optional NVIDIA NIM agent bridge, a browser control panel, and a global `Win + Alt` dictation companion.
+A local Windows voice assistant with Mongolian and English speech-to-text, text-to-speech, an optional NVIDIA NIM agent bridge, a browser control panel, and a global `Ctrl + Alt` dictation companion.
 
 ## What is included
 

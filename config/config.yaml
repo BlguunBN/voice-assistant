@@ -57,7 +57,7 @@ audio:
 
 
 desktop:
-  hotkey: 'win+alt'
+  hotkey: 'ctrl+alt'
   language: auto
 
 vad:

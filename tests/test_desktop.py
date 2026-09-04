@@ -73,7 +73,7 @@ def test_desktop_instance_lock_allows_relaunch_after_release(monkeypatch):
 def test_config_exposes_desktop_dictation_defaults():
     config = load_config()
 
-    assert config.desktop_hotkey == "win+alt"
+    assert config.desktop_hotkey == "ctrl+alt"
     assert config.desktop_language == "auto"
 
 
