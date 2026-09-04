@@ -169,7 +169,7 @@ class DesktopDictation:
         if self.status_callback is not None:
             self.status_callback(value)
         if self._icon is not None:
-            self._icon.title = f"Mongolian Dictation — {value}"
+            self._icon.title = f"Mongolian Dictation — {value}"[:128]
 
     def run(self) -> None:
         """Start the tray icon and background global dictation loop."""

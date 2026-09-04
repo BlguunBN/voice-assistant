@@ -66,6 +66,29 @@ def test_desktop_transcribe_posts_multipart_audio(monkeypatch, tmp_path: Path):
     assert b"dictation.wav" in request.data
     assert b"RIFF-test" in request.data
 
+def test_desktop_error_status_truncates_tray_title():
+    engine = object.__new__(DesktopDictation)
+    engine.config = load_config()
+    updates: dict[str, Any] = {}
+
+    class FakeStatusStore:
+        def update(self, status: str, **kwargs: Any) -> None:
+            updates["status"] = status
+            updates.update(kwargs)
+
+    class FakeIcon:
+        title = ""
+
+    engine.status_store = FakeStatusStore()
+    engine.status_callback = None
+    engine._icon = FakeIcon()
+
+    error = "error: STT API request failed: " + "x" * 200
+    engine._set_status(error)
+
+    assert len(engine._icon.title) <= 128
+    assert updates["status"] == "error"
+    assert updates["detail"] == error.removeprefix("error: ").strip()
 
 def test_clipboard_injector_restores_previous_text(monkeypatch):
     import ctypes
