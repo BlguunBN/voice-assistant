@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import logging
 import tempfile
@@ -30,6 +31,50 @@ LOGGER = logging.getLogger(__name__)
 
 class DesktopDictationError(RuntimeError):
     """Raised when the desktop dictation companion cannot complete a turn."""
+
+
+class DesktopInstanceLock:
+    """Own the interactive Windows session mutex for one hotkey companion."""
+
+    _NAME = "Local\\MongolianVoiceAssistantDesktop"
+    _ERROR_ALREADY_EXISTS = 183
+
+    def __init__(self) -> None:
+        self._handle: Any = None
+        self._kernel32: Any = None
+
+    @staticmethod
+    def _windows_kernel32() -> Any:
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        return kernel32
+
+    def acquire(self) -> None:
+        if not hasattr(ctypes, "WinDLL"):
+            raise DesktopDictationError("Desktop dictation requires Windows")
+        kernel32 = self._windows_kernel32()
+        handle = kernel32.CreateMutexW(None, False, self._NAME)
+        if not handle:
+            raise DesktopDictationError("Unable to create the desktop companion lock")
+        if ctypes.get_last_error() == self._ERROR_ALREADY_EXISTS:
+            kernel32.CloseHandle(handle)
+            raise DesktopDictationError("Desktop dictation is already running")
+        self._handle = handle
+        self._kernel32 = kernel32
+
+    def release(self) -> None:
+        if self._handle is None:
+            return
+        try:
+            self._kernel32.CloseHandle(self._handle)
+        finally:
+            self._handle = None
+            self._kernel32 = None
 
 
 @dataclass(frozen=True)
@@ -181,34 +226,39 @@ class DesktopDictation:
                 "Desktop mode requires pystray and Pillow; install project requirements first"
             ) from exc
 
-        image = Image.new("RGB", (64, 64), "#10243e")
-        ImageDraw.Draw(image).rounded_rectangle((8, 8, 56, 56), radius=12, fill="#56d6c9")
-        icon = pystray.Icon(
-            "mongolian-voice-assistant",
-            image,
-            "Mongolian Dictation — armed",
-            menu=pystray.Menu(
-                pystray.MenuItem("Show overlay", self._show_overlay),
-                pystray.MenuItem("Open control panel", self._open_control_panel),
-                pystray.MenuItem("Quit", self._quit),
-            ),
-        )
-        self._icon = icon
-        self.status_store.clear()
+        instance_lock = DesktopInstanceLock()
+        instance_lock.acquire()
         try:
-            self.overlay_host.start()
-        except OverlayHostError as exc:
-            LOGGER.warning("Desktop overlay unavailable: %s", exc)
-        self._set_status("armed")
-        worker = threading.Thread(target=self._loop, name="desktop-dictation", daemon=True)
-        worker.start()
-        try:
-            icon.run()
+            image = Image.new("RGB", (64, 64), "#10243e")
+            ImageDraw.Draw(image).rounded_rectangle((8, 8, 56, 56), radius=12, fill="#56d6c9")
+            icon = pystray.Icon(
+                "mongolian-voice-assistant",
+                image,
+                "Mongolian Dictation — armed",
+                menu=pystray.Menu(
+                    pystray.MenuItem("Show overlay", self._show_overlay),
+                    pystray.MenuItem("Open control panel", self._open_control_panel),
+                    pystray.MenuItem("Quit", self._quit),
+                ),
+            )
+            self._icon = icon
+            self.status_store.clear()
+            try:
+                self.overlay_host.start()
+            except OverlayHostError as exc:
+                LOGGER.warning("Desktop overlay unavailable: %s", exc)
+            self._set_status("armed")
+            worker = threading.Thread(target=self._loop, name="desktop-dictation", daemon=True)
+            worker.start()
+            try:
+                icon.run()
+            finally:
+                self._stop.set()
+                worker.join(timeout=2)
+                self.overlay_host.stop()
+                self._icon = None
         finally:
-            self._stop.set()
-            worker.join(timeout=2)
-            self.overlay_host.stop()
-            self._icon = None
+            instance_lock.release()
 
     def _loop(self) -> None:
         while not self._stop.is_set():

@@ -10,7 +10,7 @@ import pytest
 import src.desktop.dictation as dictation_module
 from src.audio.hotkey import HotkeyError, KeyChord
 from src.core.config import load_config
-from src.desktop.dictation import DesktopDictation
+from src.desktop.dictation import DesktopDictation, DesktopDictationError, DesktopInstanceLock
 from src.desktop.injector import ClipboardTextInjector
 def test_desktop_hotkey_parses_ctrl_shift_space():
     chord = KeyChord.parse("Ctrl + Shift + Space")
@@ -22,6 +22,52 @@ def test_desktop_hotkey_parses_ctrl_shift_space():
 def test_desktop_hotkey_rejects_unsupported_keys():
     with pytest.raises(HotkeyError, match="Unsupported push-to-talk key"):
         KeyChord.parse("ctrl+f1")
+
+
+def test_desktop_instance_lock_allows_relaunch_after_release(monkeypatch):
+    import ctypes
+
+    class FakeFunction:
+        def __init__(self, callback):
+            self.callback = callback
+
+        def __call__(self, *args):
+            return self.callback(*args)
+
+    class FakeKernel32:
+        def __init__(self):
+            self.active_handles: set[int] = set()
+            self.next_handle = 40
+            self.closed: list[int] = []
+            self.CreateMutexW = FakeFunction(self.create_mutex)
+            self.CloseHandle = FakeFunction(self.close_handle)
+
+        def create_mutex(self, *_args):
+            already_exists = bool(self.active_handles)
+            self.next_handle += 1
+            handle = self.next_handle
+            self.active_handles.add(handle)
+            monkeypatch.setattr(ctypes, "get_last_error", lambda: 183 if already_exists else 0)
+            return handle
+
+        def close_handle(self, handle):
+            self.closed.append(handle)
+            self.active_handles.discard(handle)
+
+    kernel32 = FakeKernel32()
+    monkeypatch.setattr(ctypes, "WinDLL", lambda *_args, **_kwargs: kernel32, raising=False)
+
+    first = DesktopInstanceLock()
+    first.acquire()
+    with pytest.raises(DesktopDictationError, match="already running"):
+        DesktopInstanceLock().acquire()
+    first.release()
+
+    relaunched = DesktopInstanceLock()
+    relaunched.acquire()
+    relaunched.release()
+
+    assert kernel32.closed == [42, 41, 43]
 
 
 def test_config_exposes_desktop_dictation_defaults():
