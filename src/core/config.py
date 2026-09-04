@@ -281,7 +281,24 @@ class AppConfig:
         value = self.data[section][key]
         if not isinstance(value, str) or not value.strip():
             raise ConfigError(f"{section}.{key} must be a non-empty path")
-        return Path(os.path.expandvars(os.path.expanduser(value))).resolve()
+        expanded = Path(os.path.expandvars(os.path.expanduser(value)))
+        if expanded.is_absolute():
+            return expanded.resolve()
+
+        storage = self.data.get("storage", {})
+        root_value = storage.get("root", ".") if isinstance(storage, dict) else "."
+        if not isinstance(root_value, str) or not root_value.strip():
+            raise ConfigError("storage.root must be a non-empty path")
+        configured_root = Path(os.path.expandvars(os.path.expanduser(root_value)))
+        base_root_value = os.getenv("VOICE_ASSISTANT_ROOT")
+        base_root = (
+            Path(os.path.expandvars(os.path.expanduser(base_root_value)))
+            if base_root_value and base_root_value.strip()
+            else self.path.parent.parent
+        )
+        if not configured_root.is_absolute():
+            configured_root = base_root / configured_root
+        return (configured_root / expanded).resolve()
 
     def validate(self) -> None:
         if self.language != "mn":

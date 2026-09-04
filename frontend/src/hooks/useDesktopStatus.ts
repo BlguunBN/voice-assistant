@@ -8,6 +8,8 @@ export function useDesktopStatus() {
     transcript: null,
     detail: null,
     updated_at: 0,
+    selected_language: "auto",
+    detected_language: null,
   });
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());

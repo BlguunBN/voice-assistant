@@ -12,11 +12,15 @@ export type Health = {
   external_network_exposure: boolean;
 };
 
+export type DesktopLanguage = "mn" | "en" | "auto";
+
 export type DesktopStatus = {
   status: string;
   transcript: string | null;
   detail: string | null;
   updated_at: number;
+  selected_language: DesktopLanguage;
+  detected_language: "mn" | "en" | null;
 };
 
 export type VoiceMessage = {

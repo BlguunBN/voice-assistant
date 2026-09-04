@@ -16,6 +16,8 @@ class DesktopStatus:
     transcript: str | None
     detail: str | None
     updated_at: float
+    selected_language: str = "auto"
+    detected_language: str | None = None
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -41,6 +43,8 @@ class DesktopStatusStore:
                 transcript=self._optional_string(payload.get("transcript")),
                 detail=self._optional_string(payload.get("detail")),
                 updated_at=self._number(payload.get("updated_at")),
+                selected_language=self._string(payload.get("selected_language"), "auto"),
+                detected_language=self._optional_string(payload.get("detected_language")),
             )
 
     def clear(self, status: str = "armed") -> DesktopStatus:
@@ -52,7 +56,10 @@ class DesktopStatusStore:
         *,
         transcript: str | None = None,
         detail: str | None = None,
+        selected_language: str | None = None,
+        detected_language: str | None = None,
         preserve_transcript: bool = True,
+        preserve_detected_language: bool = True,
     ) -> DesktopStatus:
         with self._lock:
             previous = self.read()
@@ -61,6 +68,12 @@ class DesktopStatusStore:
                 transcript=transcript if transcript is not None or not preserve_transcript else previous.transcript,
                 detail=detail,
                 updated_at=time.time(),
+                selected_language=selected_language or previous.selected_language,
+                detected_language=(
+                    detected_language
+                    if detected_language is not None or not preserve_detected_language
+                    else previous.detected_language
+                ),
             )
             self.path.parent.mkdir(parents=True, exist_ok=True)
             temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")

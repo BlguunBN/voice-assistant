@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from io import BytesIO
 from pathlib import Path
 
@@ -198,6 +199,38 @@ def test_api_exposes_desktop_status_snapshot(tmp_path: Path):
     assert response.status_code == 200
     assert response.json()["status"] == "pasting"
     assert response.json()["transcript"] == "Сайн байна уу"
+    assert response.json()["selected_language"] == "auto"
+
+
+def test_api_reads_and_updates_desktop_language_preferences(tmp_path: Path):
+    config = load_config()
+    data = deepcopy(config.data)
+    data["storage"]["project_root"] = str(tmp_path)
+    isolated_config = AppConfig(path=config.path, data=data)
+    isolated_config.validate()
+    client = TestClient(create_app(isolated_config, stt=FakeSTT(), tts=FakeTTS(), agent=FakeAgent()))
+
+    with client:
+        assert client.get("/desktop/preferences").json() == {"selected_language": "auto"}
+        response = client.put("/desktop/preferences", json={"selected_language": "en"})
+
+    assert response.status_code == 200
+    assert response.json() == {"selected_language": "en"}
+    assert json.loads((tmp_path / "cache" / "desktop-preferences.json").read_text(encoding="utf-8")) == {"selected_language": "en"}
+
+
+def test_api_rejects_unsupported_desktop_language(tmp_path: Path):
+    config = load_config()
+    data = deepcopy(config.data)
+    data["storage"]["project_root"] = str(tmp_path)
+    isolated_config = AppConfig(path=config.path, data=data)
+    isolated_config.validate()
+    client = TestClient(create_app(isolated_config, stt=FakeSTT(), tts=FakeTTS(), agent=FakeAgent()))
+
+    with client:
+        response = client.put("/desktop/preferences", json={"selected_language": "fr"})
+
+    assert response.status_code == 422
 
 
 def test_config_rejects_non_loopback_api_host():

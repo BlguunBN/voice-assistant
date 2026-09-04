@@ -13,11 +13,11 @@ from pydantic import BaseModel, Field
 
 from src.agent import AgentBridge, EchoAgentBridge, NIMError, NvidiaNIMAgentBridge
 from src.core.config import AppConfig, load_config
+from src.desktop.preferences import DesktopPreferencesStore
 from src.desktop.status import DesktopStatusStore
 from src.stt import STTError, STTLanguageRouter
 from src.stt.router import STTLanguage
 from src.tts import EdgeMongolianTTSEngine, EdgeTTSError, EnglishTTSEngine, TTSError, TTSEngine
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +35,11 @@ class ChatRequest(BaseModel):
 
 class STTResponse(BaseModel):
     transcript: str
+    detected_language: Literal["mn", "en"] | None = None
 
+
+class DesktopPreferencesRequest(BaseModel):
+    selected_language: Literal["mn", "en", "auto"]
 
 class ChatResponse(BaseModel):
     message: str
@@ -86,7 +90,10 @@ def create_app(
     stt_lock = RLock()
     tts_lock = RLock()
     english_tts_lock = RLock()
-    desktop_status_store = DesktopStatusStore(app_config.project_root / "cache" / "desktop-status.json")
+    cache_dir = app_config.project_root / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    desktop_status_store = DesktopStatusStore(cache_dir / "desktop-status.json")
+    desktop_preferences_store = DesktopPreferencesStore(cache_dir / "desktop-preferences.json")
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -130,7 +137,17 @@ def create_app(
 
     @app.get("/desktop/status")
     def desktop_status() -> dict[str, object]:
-        return desktop_status_store.read().as_dict()
+        payload = desktop_status_store.read().as_dict()
+        payload["selected_language"] = desktop_preferences_store.read().selected_language
+        return payload
+
+    @app.get("/desktop/preferences")
+    def desktop_preferences() -> dict[str, object]:
+        return desktop_preferences_store.read().as_dict()
+
+    @app.put("/desktop/preferences")
+    def update_desktop_preferences(request: DesktopPreferencesRequest) -> dict[str, object]:
+        return desktop_preferences_store.update(request.selected_language).as_dict()
 
     @app.get("/voices")
     def voices() -> dict[str, object]:
@@ -141,7 +158,7 @@ def create_app(
         except (EdgeTTSError, TTSError, OSError, ValueError) as exc:
             raise _error("voice discovery", exc) from exc
 
-    @app.post("/stt", response_model=STTResponse)
+    @app.post("/stt", response_model=STTResponse, response_model_exclude_none=True)
     async def transcribe(
         file: UploadFile = File(...),
         language: Literal["mn", "en", "auto"] = Form("mn"),
@@ -167,7 +184,8 @@ def create_app(
             transcript = transcript.strip()
             if not transcript:
                 raise HTTPException(status_code=422, detail="STT returned an empty transcript")
-            return STTResponse(transcript=transcript)
+            detected_language = getattr(stt_engine, "detected_language", None) if language == "auto" else None
+            return STTResponse(transcript=transcript, detected_language=detected_language)
         except HTTPException:
             raise
         except (STTError, OSError, ValueError, TypeError) as exc:

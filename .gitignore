@@ -10,7 +10,6 @@ __pycache__/
 .mypy_cache/
 *.wav
 *.tmp
-D:\AI\huggingface\
 node_modules/
 frontend/dist/
 frontend/*.log

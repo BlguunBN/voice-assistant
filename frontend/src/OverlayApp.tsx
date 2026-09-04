@@ -44,6 +44,7 @@ const stateCopy: Record<OverlayState, StateCopy> = {
 };
 
 const waveformBars = [24, 38, 18, 46, 31, 54, 26, 43, 20, 35, 48, 27, 40, 23, 51, 30, 44, 19];
+const languageLabels: Record<"mn" | "en", string> = { mn: "MONGOLIAN", en: "ENGLISH" };
 
 function isOverlayState(value: string): value is OverlayState {
   return value in stateCopy;
@@ -130,7 +131,8 @@ function OverlayApp() {
               <p className="overlay-error" role="alert">{status.detail || "Check the tray companion and local API."}</p>
             ) : (
               <div className="overlay-meta">
-                <span>{currentState === "listening" ? "MIC INPUT" : "MONGOLIAN"}</span>
+                <span>{currentState === "listening" ? "MIC INPUT" : status.selected_language === "auto" ? "AUTO DETECT" : languageLabels[status.selected_language]}</span>
+                {status.detected_language && status.selected_language === "auto" && <span>DETECTED {languageLabels[status.detected_language]}</span>}
                 <span>{currentState === "listening" ? "LIVE" : "STT READY"}</span>
               </div>
             )}

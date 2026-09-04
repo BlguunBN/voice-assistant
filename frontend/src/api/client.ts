@@ -1,4 +1,4 @@
-import type { DesktopStatus, Health } from "../types";
+import type { DesktopLanguage, DesktopStatus, Health } from "../types";
 
 export type ConversationLanguage = "mn" | "en";
 export type TranscriptionLanguage = ConversationLanguage | "auto";
@@ -30,11 +30,22 @@ export async function getDesktopStatus(): Promise<DesktopStatus> {
   return request<DesktopStatus>("/desktop/status");
 }
 
+export async function getDesktopPreferences(): Promise<{ selected_language: DesktopLanguage }> {
+  return request<{ selected_language: DesktopLanguage }>("/desktop/preferences");
+}
+
+export async function updateDesktopPreferences(selected_language: DesktopLanguage): Promise<{ selected_language: DesktopLanguage }> {
+  return request<{ selected_language: DesktopLanguage }>("/desktop/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selected_language }),
+  });
+}
+
 export async function getVoices(): Promise<string[]> {
   const body = await request<{ voices: string[] }>("/voices");
   return body.voices;
 }
-
 export async function transcribe(audio: Blob, language: TranscriptionLanguage = "mn"): Promise<string> {
   const form = new FormData();
   form.append("file", audio, "browser-recording.wav");

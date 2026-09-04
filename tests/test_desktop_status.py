@@ -17,13 +17,21 @@ def test_status_store_round_trips_transcript_and_error(tmp_path: Path) -> None:
     assert listening.status == "listening"
     assert listening.transcript == ""
 
-    pasted = store.update("pasting", transcript="Сайн байна уу")
+    pasted = store.update(
+        "pasting",
+        transcript="Сайн байна уу",
+        selected_language="auto",
+        detected_language="mn",
+    )
     assert pasted.status == "pasting"
     assert store.read().transcript == "Сайн байна уу"
+    assert store.read().selected_language == "auto"
+    assert store.read().detected_language == "mn"
 
     error = store.update("error", detail="STT failed")
     assert error.detail == "STT failed"
     assert store.read().transcript == "Сайн байна уу"
+    assert store.read().detected_language == "mn"
 
 
 def test_status_store_recovers_from_invalid_json(tmp_path: Path) -> None:

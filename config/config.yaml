@@ -2,20 +2,20 @@ system:
   language: mn
 
 storage:
-  root: 'D:/AI'
-  project_root: 'D:/AI/voice-assistant'
-  model_root: 'D:/AI/models'
-  recordings: 'D:/AI/recordings'
-  huggingface_home: 'D:/AI/huggingface'
-  huggingface_cache: 'D:/AI/huggingface/hub'
+  root: '.'
+  project_root: '.'
+  model_root: 'models'
+  recordings: 'recordings'
+  huggingface_home: 'huggingface'
+  huggingface_cache: 'huggingface/hub'
 
 stt:
   model: 'Blgn94/whisper-small-mn-v3'
-  local_path: 'D:/AI/models/stt/whisper-small-mn-v3'
+  local_path: 'models/stt/whisper-small-mn-v3'
   english_model: 'openai/whisper-small.en'
-  english_local_path: 'D:/AI/models/stt/whisper-small.en'
+  english_local_path: 'models/stt/whisper-small.en'
   auto_model: 'openai/whisper-tiny'
-  auto_local_path: 'D:/AI/models/stt/whisper-tiny-auto'
+  auto_local_path: 'models/stt/whisper-tiny-auto'
   device: cuda
   fallback_device: cpu
   sample_rate: 16000
@@ -26,7 +26,7 @@ tts:
   # Microsoft Edge Mongolian voice. The API returns the selected format.
   provider: edge
   model: 'Bokhbat/mongolian-vits-tts'
-  local_path: 'D:/AI/models/tts/mongolian-vits-tts'
+  local_path: 'models/tts/mongolian-vits-tts'
   device: cpu
   speaker_id: null
   edge_voice: 'mn-MN-YesuiNeural'

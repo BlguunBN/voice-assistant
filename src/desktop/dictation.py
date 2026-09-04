@@ -22,6 +22,7 @@ from src.audio.hotkey import KeyChord
 from src.core.config import AppConfig
 from src.desktop.injector import ClipboardTextInjector
 from src.desktop.overlay import DesktopOverlayHost, OverlayHostError
+from src.desktop.preferences import DesktopPreferencesStore
 from src.desktop.status import DesktopStatusStore
 
 LOGGER = logging.getLogger(__name__)
@@ -118,7 +119,9 @@ class DesktopDictation:
         self.status_callback = status_callback
         self._stop = threading.Event()
         self._icon: Any = None
+        self._last_detected_language: str | None = None
         self.status_store = DesktopStatusStore(config.project_root / "cache" / "desktop-status.json")
+        self.preferences_store = DesktopPreferencesStore(config.project_root / "cache" / "desktop-preferences.json")
         self.overlay_host = DesktopOverlayHost(
             self.status_store.path,
         )
@@ -136,13 +139,33 @@ class DesktopDictation:
     def transcribe_url(self) -> str:
         return f"http://{self.config.api_host}:{self.config.api_port}/stt"
 
-    def _set_status(self, value: str, *, transcript: str | None = None) -> None:
+    def _selected_language(self) -> str:
+        store = getattr(self, "preferences_store", None)
+        if store is not None:
+            return store.read().selected_language
+        return self.config.desktop_language
+
+    def _set_status(
+        self,
+        value: str,
+        *,
+        transcript: str | None = None,
+        detected_language: str | None = None,
+    ) -> None:
         status = value
         detail: str | None = None
         if value.startswith("error:"):
             status, _, detail = value.partition(":")
             detail = detail.strip()
-        self.status_store.update(status, transcript=transcript, detail=detail)
+        if detected_language is not None:
+            self._last_detected_language = detected_language
+        self.status_store.update(
+            status,
+            transcript=transcript,
+            detail=detail,
+            selected_language=self._selected_language(),
+            detected_language=getattr(self, "_last_detected_language", None),
+        )
         if self.status_callback is not None:
             self.status_callback(value)
         if self._icon is not None:
@@ -219,10 +242,11 @@ class DesktopDictation:
     def _transcribe(self, audio_path: Path) -> str:
         boundary = "----VoiceAssistantBoundary"
         audio = audio_path.read_bytes()
+        selected_language = self._selected_language()
         body = (
             f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="language"\r\n\r\n'
-            f"{self.config.desktop_language}\r\n"
+            f"{selected_language}\r\n"
             f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="file"; filename="dictation.wav"\r\n'
             "Content-Type: audio/wav\r\n\r\n"
@@ -241,6 +265,13 @@ class DesktopDictation:
         transcript = payload.get("transcript")
         if not isinstance(transcript, str):
             raise DesktopDictationError("STT API returned an invalid transcript")
+        detected_language = payload.get("detected_language")
+        if detected_language in {"mn", "en"}:
+            self._last_detected_language = detected_language
+        elif selected_language in {"mn", "en"}:
+            self._last_detected_language = selected_language
+        else:
+            self._last_detected_language = None
         return transcript.strip()
 
     def _on_recording_started(self) -> None:

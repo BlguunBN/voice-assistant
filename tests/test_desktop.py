@@ -12,8 +12,6 @@ from src.audio.hotkey import HotkeyError, KeyChord
 from src.core.config import load_config
 from src.desktop.dictation import DesktopDictation
 from src.desktop.injector import ClipboardTextInjector
-
-
 def test_desktop_hotkey_parses_ctrl_shift_space():
     chord = KeyChord.parse("Ctrl + Shift + Space")
 
@@ -49,7 +47,7 @@ def test_desktop_transcribe_posts_multipart_audio(monkeypatch, tmp_path: Path):
             return False
 
         def read(self) -> bytes:
-            return '{"transcript":"Сайн байна уу"}'.encode()
+            return '{"transcript":"Сайн байна уу","detected_language":"en"}'.encode()
 
     def fake_urlopen(request: Any, timeout: int):
         captured["request"] = request
@@ -59,6 +57,7 @@ def test_desktop_transcribe_posts_multipart_audio(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(dictation_module.urllib_request, "urlopen", fake_urlopen)
 
     assert engine._transcribe(audio_path) == "Сайн байна уу"
+    assert engine._last_detected_language == "en"
     request = captured["request"]
     assert request.full_url.endswith("/stt")
     assert request.headers["Content-type"].startswith("multipart/form-data; boundary=")

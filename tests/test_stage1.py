@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.core.config import ConfigError, load_config
+from src.core.config import AppConfig, ConfigError, load_config
 from src.stt.engine import STTEngine, STTError
 
 
@@ -38,14 +38,45 @@ class FakeModel:
         return torch.tensor([[1, 2, 3]])
 
 
-def test_default_config_keeps_models_and_cache_on_d_drive():
+def test_default_config_resolves_runtime_paths_from_repository_root():
     config = load_config()
 
     assert config.stt_model_id == "Blgn94/whisper-small-mn-v3"
-    assert str(config.stt_local_path).upper().startswith("D:\\AI\\MODELS")
-    assert str(config.huggingface_cache).upper().startswith("D:\\AI\\HUGGINGFACE")
+    assert config.stt_local_path == config.project_root / "models" / "stt" / "whisper-small-mn-v3"
+    assert config.huggingface_cache == config.project_root / "huggingface" / "hub"
     assert config.stt_sample_rate == 16_000
     assert config.tts_english_device == "cuda"
+
+
+def test_relative_paths_honor_voice_assistant_root_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("VOICE_ASSISTANT_ROOT", str(runtime_root))
+
+    config = load_config()
+
+    assert config.project_root == runtime_root.resolve()
+    assert config.model_root == runtime_root / "models"
+    assert config.recordings_root == runtime_root / "recordings"
+
+
+def test_explicit_absolute_paths_remain_absolute(tmp_path: Path):
+    absolute_project = tmp_path / "project"
+    config = AppConfig(
+        path=tmp_path / "config.yaml",
+        data={
+            "storage": {
+                "root": ".",
+                "project_root": str(absolute_project),
+                "model_root": str(tmp_path / "models"),
+                "recordings": str(tmp_path / "recordings"),
+                "huggingface_home": str(tmp_path / "hf"),
+                "huggingface_cache": str(tmp_path / "hf" / "hub"),
+            }
+        },
+    )
+
+    assert config.project_root == absolute_project.resolve()
+    assert config.model_root == (tmp_path / "models").resolve()
 
 def test_invalid_language_is_rejected(tmp_path: Path):
     config_path = tmp_path / "config.yaml"
