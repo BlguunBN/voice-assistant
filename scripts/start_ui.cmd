@@ -6,5 +6,5 @@ if not exist "frontend\node_modules\.bin\vite.cmd" (
   exit /b 1
 )
 cd frontend
-npm run dev
+npm run dev -- --host 127.0.0.1 --strictPort
 exit /b %ERRORLEVEL%

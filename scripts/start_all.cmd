@@ -25,6 +25,7 @@ if errorlevel 1 (
 start "Voice Assistant API" /D "%ROOT%" cmd /k call "%ROOT%\scripts\start_api.cmd"
 start "Voice Assistant UI" /D "%ROOT%" cmd /k call "%ROOT%\scripts\start_ui.cmd"
 start "Voice Assistant Desktop" /D "%ROOT%" cmd /k "%PYTHON%" -m src.main desktop
+start "Voice Assistant Browser" /D "%ROOT%" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%\scripts\open_control_panel.ps1"
 exit /b 0
 
 :check
