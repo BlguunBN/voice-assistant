@@ -52,14 +52,21 @@ The UI is a Vite development server. It calls the local API and stores device se
 
 ## 5. Download models when needed
 
-The configured Edge TTS provider does not require a local Mongolian TTS model. Download the local models only for the corresponding local backend:
+The configured Edge TTS provider does not require a local Mongolian TTS model. Download the STT model for the language selected in the desktop UI:
 
 ```powershell
-.venv\Scripts\python.exe scripts\download_stt.py
-.venv\Scripts\python.exe scripts\download_tts.py
+.venv\Scripts\python.exe scripts\download_stt.py --language mn
+.venv\Scripts\python.exe scripts\download_stt.py --language en
+.venv\Scripts\python.exe scripts\download_stt.py --language auto
 ```
 
-These scripts load `config/config.yaml` and honor `VOICE_ASSISTANT_ROOT`.
+Use `--language all` to download every configured STT model. These scripts load `config/config.yaml` and honor `VOICE_ASSISTANT_ROOT`.
+
+For the configured local TTS backend only:
+
+```powershell
+.venv\Scripts\python.exe scripts\download_tts.py
+```
 
 ## 6. Start the application
 
