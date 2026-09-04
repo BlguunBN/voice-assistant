@@ -12,8 +12,8 @@ storage:
 stt:
   model: 'Blgn94/whisper-small-mn-v3'
   local_path: 'models/stt/whisper-small-mn-v3'
-  english_model: 'openai/whisper-small.en'
-  english_local_path: 'models/stt/whisper-small.en'
+  english_model: 'openai/whisper-tiny.en'
+  english_local_path: 'models/stt/whisper-tiny.en'
   auto_model: 'openai/whisper-tiny'
   auto_local_path: 'models/stt/whisper-tiny-auto'
   device: cuda

@@ -62,6 +62,8 @@ The configured Edge TTS provider does not require a local Mongolian TTS model. D
 
 Use `--language all` to download every configured STT model. These scripts load `config/config.yaml` and honor `VOICE_ASSISTANT_ROOT`.
 
+The English default is `openai/whisper-tiny.en` to fit machines with 4 GiB GPUs and small Windows paging files. The larger `whisper-small.en` model can be selected manually only after increasing available virtual memory.
+
 For the configured local TTS backend only:
 
 ```powershell

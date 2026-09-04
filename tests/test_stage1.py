@@ -43,6 +43,8 @@ def test_default_config_resolves_runtime_paths_from_repository_root():
 
     assert config.stt_model_id == "Blgn94/whisper-small-mn-v3"
     assert config.stt_local_path == config.project_root / "models" / "stt" / "whisper-small-mn-v3"
+    assert config.stt_english_model_id == "openai/whisper-tiny.en"
+    assert config.stt_english_local_path == config.project_root / "models" / "stt" / "whisper-tiny.en"
     assert config.huggingface_cache == config.project_root / "huggingface" / "hub"
     assert config.stt_sample_rate == 16_000
     assert config.tts_english_device == "cuda"
