@@ -24,7 +24,11 @@ class AutoDetectProcessor:
 class AutoDetectModel:
     def __init__(self, language_token_id: int) -> None:
         self.language_token_id = language_token_id
-        self.generation_config = type("GenerationConfig", (), {"language": "mongolian"})()
+        self.generation_config = type(
+            "GenerationConfig",
+            (),
+            {"language": "mongolian", "lang_to_id": {"<|mn|>": 41, "<|en|>": 42, "<|fr|>": 99}},
+        )()
         self.detect_kwargs: dict[str, object] = {}
 
     def detect_language(self, **kwargs):
@@ -49,14 +53,17 @@ def test_auto_detection_uses_whisper_detector_tokens(
     assert model.detect_kwargs["generation_config"].language is None
 
 
-def test_auto_detection_rejects_unsupported_whisper_language():
+def test_auto_detection_restricts_whisper_to_mongolian_and_english():
     engine = STTEngine(load_config(), language="auto")
     engine._processor = AutoDetectProcessor()
-    engine._model = AutoDetectModel(99)
+    model = AutoDetectModel(99)
+    engine._model = model
     engine.loaded = True
 
     with pytest.raises(STTError, match="could not detect Mongolian or English"):
         engine.detect_language(np.zeros(16_000, dtype=np.float32))
+
+    assert model.detect_kwargs["generation_config"].lang_to_id == {"<|mn|>": 41, "<|en|>": 42}
 
 
 def test_auto_detector_uses_neutral_whisper_model_configuration():

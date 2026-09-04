@@ -187,6 +187,18 @@ class STTEngine:
         token = convert_ids_to_tokens(int(token_id))
         return {"<|mn|>": "mn", "<|en|>": "en"}.get(str(token))
 
+    @staticmethod
+    def _supported_language_ids(generation_config: Any) -> dict[str, int]:
+        """Limit auto mode to the two languages the installed STT models support."""
+        language_ids = getattr(generation_config, "lang_to_id", {})
+        if not isinstance(language_ids, dict):
+            return {}
+        return {
+            token: token_id
+            for token, token_id in language_ids.items()
+            if str(token).strip("<|>").lower() in {"mn", "en"}
+        }
+
     def detect_language(self, audio: str | os.PathLike[str] | np.ndarray) -> str:
         """Detect Mongolian or English using the neutral multilingual Whisper model."""
         self.load()
@@ -204,6 +216,9 @@ class STTEngine:
 
         detector_config = copy(self._model.generation_config)
         detector_config.language = None
+        supported_ids = self._supported_language_ids(detector_config)
+        if supported_ids:
+            detector_config.lang_to_id = supported_ids
         with torch.inference_mode():
             detected_ids = self._model.detect_language(
                 input_features=model_inputs["input_features"],
