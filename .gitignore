@@ -11,3 +11,10 @@ __pycache__/
 *.wav
 *.tmp
 D:\AI\huggingface\
+node_modules/
+frontend/dist/
+frontend/*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

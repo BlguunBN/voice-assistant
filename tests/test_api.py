@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from src.agent import AgentBridge
 from src.api.server import create_app
 from src.core.config import AppConfig, ConfigError, load_config
+from src.desktop.status import DesktopStatusStore
 
 
 def wav_bytes() -> bytes:
@@ -81,9 +82,10 @@ def make_client() -> tuple[TestClient, FakeSTT, FakeTTS, FakeAgent]:
     config = load_config()
     stt = FakeSTT()
     tts = FakeTTS()
+    english_tts = FakeTTS()
     agent = FakeAgent()
     assert isinstance(agent, AgentBridge)
-    return TestClient(create_app(config, stt=stt, tts=tts, agent=agent)), stt, tts, agent
+    return TestClient(create_app(config, stt=stt, tts=tts, agent=agent, english_tts=english_tts)), stt, tts, agent
 
 
 def test_api_exposes_health_and_localhost_security_boundary():
@@ -98,6 +100,7 @@ def test_api_exposes_health_and_localhost_security_boundary():
     assert response.json()["external_network_exposure"] is False
     assert response.json()["stt_loaded"] is True
     assert response.json()["tts_loaded"] is True
+    assert response.json()["english_tts_loaded"] is True
 
 
 def test_api_preloads_each_engine_once_for_a_lifespan():
@@ -177,6 +180,24 @@ def test_api_rejects_oversized_upload():
         response = client.post("/stt", files={"file": ("input.wav", b"12345", "audio/wav")})
 
     assert response.status_code == 413
+
+
+def test_api_exposes_desktop_status_snapshot(tmp_path: Path):
+    config = load_config()
+    data = deepcopy(config.data)
+    data["storage"]["project_root"] = str(tmp_path)
+    isolated_config = AppConfig(path=config.path, data=data)
+    isolated_config.validate()
+    store = DesktopStatusStore(tmp_path / "cache" / "desktop-status.json")
+    store.update("pasting", transcript="Сайн байна уу")
+    client = TestClient(create_app(isolated_config, stt=FakeSTT(), tts=FakeTTS(), agent=FakeAgent()))
+
+    with client:
+        response = client.get("/desktop/status")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "pasting"
+    assert response.json()["transcript"] == "Сайн байна уу"
 
 
 def test_config_rejects_non_loopback_api_host():

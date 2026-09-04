@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from src.agent import EchoAgent
 from src.audio import (
@@ -16,20 +16,22 @@ from src.audio import (
 )
 from src.core.config import AppConfig, ConfigError, load_config
 from src.pipeline import EchoPipeline
-from src.stt.engine import STTError, STTEngine
-from src.tts.engine import TTSError, TTSEngine
-
+from src.stt.engine import STTEngine, STTError
+from src.tts.engine import TTSEngine, TTSError
 
 LOGGER = logging.getLogger(__name__)
 
 
-def configure_logging(config: AppConfig) -> None:
-    log_path = config.project_root / "logs" / "voice-assistant.log"
+def configure_logging(config: AppConfig, log_name: str = "voice-assistant.log") -> None:
+    log_path = config.project_root / "logs" / log_name
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        log_handler = logging.FileHandler(log_path, encoding="utf-8")
+    except PermissionError:
+        log_handler = logging.StreamHandler()
     logging.basicConfig(
-        level=logging.INFO,
+        handlers=[log_handler],
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        handlers=[logging.FileHandler(log_path, encoding="utf-8")],
         force=True,
     )
 
@@ -212,6 +214,14 @@ def serve_api(config: AppConfig) -> int:
     return 0
 
 
+
+def desktop(config: AppConfig) -> int:
+    from src.desktop.dictation import DesktopDictation
+
+    DesktopDictation(config).run()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local Mongolian voice assistant")
     parser.add_argument("--config", default=None, help="Path to YAML configuration")
@@ -238,6 +248,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_parser.add_argument("--audio", dest="audio_path", default=None)
     benchmark_parser.add_argument("--iterations", type=int, default=3)
 
+    subparsers.add_parser("desktop", help="Run the global desktop dictation tray companion")
     subparsers.add_parser("api", help="Run the localhost FastAPI service")
     return parser
 
@@ -246,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         config = load_config(args.config)
-        configure_logging(config)
+        configure_logging(config, "voice-assistant-desktop.log" if args.command == "desktop" else "voice-assistant.log")
         if args.command == "status":
             print_status(config)
             return 0
@@ -268,6 +279,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.iterations < 1:
                 raise ConfigError("benchmark --iterations must be positive")
             return benchmark(config, args.audio_path, args.iterations)
+        if args.command == "desktop":
+            return desktop(config)
         if args.command == "api":
             return serve_api(config)
         raise ConfigError(f"Unsupported command: {args.command}")

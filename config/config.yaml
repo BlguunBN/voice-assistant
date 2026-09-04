@@ -12,16 +12,40 @@ storage:
 stt:
   model: 'Blgn94/whisper-small-mn-v3'
   local_path: 'D:/AI/models/stt/whisper-small-mn-v3'
+  english_model: 'openai/whisper-small.en'
+  english_local_path: 'D:/AI/models/stt/whisper-small.en'
+  auto_model: 'openai/whisper-tiny'
+  auto_local_path: 'D:/AI/models/stt/whisper-tiny-auto'
   device: cuda
   fallback_device: cpu
   sample_rate: 16000
   max_new_tokens: 256
 
 tts:
+  # Use "local" for the downloaded VITS model or "edge" for the free
+  # Microsoft Edge Mongolian voice. The API returns the selected format.
+  provider: edge
   model: 'Bokhbat/mongolian-vits-tts'
   local_path: 'D:/AI/models/tts/mongolian-vits-tts'
   device: cpu
   speaker_id: null
+  edge_voice: 'mn-MN-YesuiNeural'
+  edge_rate: '+0%'
+  edge_volume: '+0%'
+  edge_pitch: '+0Hz'
+  english_model: 'hexgrad/Kokoro-82M'
+  english_voice: 'af_heart'
+  english_device: 'cuda'
+
+llm:
+  provider: nvidia_nim
+  base_url: 'https://integrate.api.nvidia.com/v1'
+  model: null
+  api_key_env: NVIDIA_API_KEY
+  timeout_seconds: 60
+  max_tokens: 128
+  temperature: 0.2
+  system_prompt: 'You are a helpful bilingual voice assistant. Answer in the same language as the user. Keep spoken answers concise.'
 
 audio:
   input_device: null
@@ -30,6 +54,11 @@ audio:
   blocksize: 512
   max_seconds: 15
   push_to_talk_hotkey: space
+
+
+desktop:
+  hotkey: 'win+alt'
+  language: auto
 
 vad:
   enabled: true

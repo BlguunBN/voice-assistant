@@ -45,7 +45,7 @@ def test_default_config_keeps_models_and_cache_on_d_drive():
     assert str(config.stt_local_path).upper().startswith("D:\\AI\\MODELS")
     assert str(config.huggingface_cache).upper().startswith("D:\\AI\\HUGGINGFACE")
     assert config.stt_sample_rate == 16_000
-
+    assert config.tts_english_device == "cuda"
 
 def test_invalid_language_is_rejected(tmp_path: Path):
     config_path = tmp_path / "config.yaml"
@@ -114,3 +114,42 @@ def test_missing_audio_is_readable_error():
 
     with pytest.raises(STTError, match="Audio file not found"):
         engine.transcribe("missing.wav")
+def test_transcribe_passes_explicit_language_to_whisper_generate():
+    config = load_config()
+    engine = STTEngine(config)
+    engine._processor = FakeProcessor()
+    captured: dict[str, object] = {}
+
+    class CapturingModel(FakeModel):
+        def generate(self, **inputs):
+            captured.update(inputs)
+            return super().generate(**inputs)
+
+    engine._model = CapturingModel()
+    engine.device = "cpu"
+    engine.loaded = True
+
+    result = engine.transcribe(np.zeros(16_000, dtype=np.float32), language="en")
+
+    assert result == "Монгол хэлний тест"
+    assert captured["language"] == "en"
+
+def test_english_only_model_omits_language_and_task_generation_options():
+    config = load_config()
+    engine = STTEngine(config, language="en")
+    engine._processor = FakeProcessor()
+    captured: dict[str, object] = {}
+
+    class CapturingModel(FakeModel):
+        def generate(self, **inputs):
+            captured.update(inputs)
+            return super().generate(**inputs)
+
+    engine._model = CapturingModel()
+    engine.device = "cpu"
+    engine.loaded = True
+
+    engine.transcribe(np.zeros(16_000, dtype=np.float32))
+
+    assert "language" not in captured
+    assert "task" not in captured
