@@ -18,12 +18,12 @@ def test_status_store_round_trips_transcript_and_error(tmp_path: Path) -> None:
     assert listening.transcript == ""
 
     pasted = store.update(
-        "pasting",
+        "success",
         transcript="Сайн байна уу",
         selected_language="auto",
         detected_language="mn",
     )
-    assert pasted.status == "pasting"
+    assert pasted.status == "success"
     assert store.read().transcript == "Сайн байна уу"
     assert store.read().selected_language == "auto"
     assert store.read().detected_language == "mn"
@@ -47,10 +47,10 @@ def test_status_store_recovers_from_invalid_json(tmp_path: Path) -> None:
 
 def test_status_store_writes_utf8_json_atomically(tmp_path: Path) -> None:
     path = tmp_path / "desktop-status.json"
-    DesktopStatusStore(path).update("pasting", transcript="Монгол хэл")
+    DesktopStatusStore(path).update("success", transcript="Монгол хэл")
 
     payload = json.loads(path.read_text(encoding="utf-8"))
 
-    assert payload["status"] == "pasting"
+    assert payload["status"] == "success"
     assert payload["transcript"] == "Монгол хэл"
     assert not path.with_suffix(".json.tmp").exists()

@@ -205,3 +205,22 @@ body:has(.overlay-page) { background: transparent; overflow: hidden; }
 @keyframes overlay-pulse { 0%, 100% { transform: scale(0.9); box-shadow: 0 0 0 5px rgba(185, 243, 107, 0.08), 0 0 13px rgba(185, 243, 107, 0.4); } 50% { transform: scale(1.2); box-shadow: 0 0 0 8px rgba(185, 243, 107, 0.12), 0 0 20px rgba(185, 243, 107, 0.7); } }
 @media (prefers-reduced-motion: reduce) { .overlay-shell, .overlay-waveform.active span, .state-listening .overlay-status-mark { animation: none; transition: none; } }
 @media (max-width: 420px) { .overlay-page { padding: 8px; } .overlay-shell { width: 100%; } .overlay-shell.compact { width: min(100%, 248px); } }
+
+/* Native-style /overlay: intentionally isolated from the control panel. */
+body:has(.wispr-pill) { background: transparent; }
+.overlay-page { position: fixed; inset: 0; min-height: 0; padding: 18px; display: grid; place-items: start center; pointer-events: none; background: transparent; opacity: 1; transition: opacity 420ms ease; }
+.overlay-page.fading { opacity: 0; }
+.wispr-pill { width: 236px; height: 64px; display: grid; place-items: center; overflow: hidden; position: relative; border: 1px solid #252525; border-radius: 999px; background: #080808; box-shadow: 0 10px 26px rgba(0, 0, 0, .34), inset 0 1px rgba(255,255,255,.04); color: #f5f5f5; }
+.wispr-waveform { width: 96px; height: 42px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.wispr-waveform span { width: 4px; height: calc((8px + 28px * var(--bar)) * var(--amplitude, 1)); border-radius: 999px; background: #f4f4f4; transform-origin: center; animation: wispr-listening 780ms ease-in-out infinite alternate; }
+.wispr-waveform.processing span { animation-name: wispr-processing; animation-duration: 950ms; }
+.wispr-waveform.thinking span { animation-name: wispr-thinking; animation-duration: 1800ms; }
+.wispr-waveform.speaking span { animation-name: wispr-speaking; animation-duration: 600ms; }
+.wispr-check { font: 42px/1 "Segoe UI", sans-serif; font-weight: 300; animation: wispr-in 180ms ease-out both; }
+.wispr-error { width: 21px; height: 21px; display: inline-grid; place-items: center; margin-right: 8px; border-radius: 50%; background: #b94b4b; color: #fff; font: 700 13px/1 sans-serif; vertical-align: middle; }
+.wispr-message { display: inline-block; max-width: 165px; color: #ddd; font-size: 12px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
+@keyframes wispr-listening { from { transform: scaleY(.38); } to { transform: scaleY(1); } }
+@keyframes wispr-processing { 0%,100% { transform: scaleY(.34); opacity: .45; } 50% { transform: scaleY(.78); opacity: 1; } }
+@keyframes wispr-thinking { 0%,100% { transform: scaleY(.52); opacity: .55; } 50% { transform: scaleY(.72); opacity: 1; } }
+@keyframes wispr-speaking { from { transform: scaleY(.28); } to { transform: scaleY(1.08); } }
+@keyframes wispr-in { from { opacity: 0; transform: scale(.78); } to { opacity: 1; transform: scale(1); } }

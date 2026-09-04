@@ -1,151 +1,52 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDesktopStatus } from "./hooks/useDesktopStatus";
-import type { DesktopStatus } from "./types";
 
-type OverlayState = DesktopStatus["status"] | "offline";
+export type WaveformMode = "listening" | "processing" | "thinking" | "speaking";
 
-type StateCopy = {
-  eyebrow: string;
-  title: string;
-  detail: string;
+const bars = [0.34, 0.55, 0.78, 1, 0.68, 0.46, 0.82, 0.58, 0.36];
+const copy: Record<string, string> = {
+  listening: "Listening", transcribing: "Transcribing", thinking: "Thinking", speaking: "Speaking",
+  success: "Text pasted", pasting: "Text pasted", error: "Could not dictate", offline: "Offline",
 };
 
-const stateCopy: Record<OverlayState, StateCopy> = {
-  armed: {
-    eyebrow: "VOICE ASSISTANT",
-    title: "Ready when you are",
-    detail: "Hold Win + Alt to dictate",
-  },
-  listening: {
-    eyebrow: "CAPTURING AUDIO",
-    title: "Listening",
-    detail: "Release Win + Alt to transcribe",
-  },
-  transcribing: {
-    eyebrow: "MONGOLIAN STT",
-    title: "Transcribing",
-    detail: "Whisper is turning your voice into text",
-  },
-  pasting: {
-    eyebrow: "TEXT READY",
-    title: "Inserted into your app",
-    detail: "Your active window has the transcript",
-  },
-  error: {
-    eyebrow: "DESKTOP COMPANION",
-    title: "Needs attention",
-    detail: "The last dictation could not be completed",
-  },
-  offline: {
-    eyebrow: "DESKTOP COMPANION",
-    title: "Overlay offline",
-    detail: "Start the local API and tray companion",
-  },
-};
-
-const waveformBars = [24, 38, 18, 46, 31, 54, 26, 43, 20, 35, 48, 27, 40, 23, 51, 30, 44, 19];
-const languageLabels: Record<"mn" | "en", string> = { mn: "MONGOLIAN", en: "ENGLISH" };
-
-function isOverlayState(value: string): value is OverlayState {
-  return value in stateCopy;
+/** Shared minimal waveform. `amplitude` is reserved for a future microphone meter. */
+export function Waveform({ mode, amplitude }: { mode: WaveformMode; amplitude?: number }) {
+  const style = { "--amplitude": amplitude === undefined ? 1 : Math.max(0, Math.min(1, amplitude)) } as React.CSSProperties;
+  return <div className={`wispr-waveform ${mode}`} style={style} aria-hidden="true">
+    {bars.map((height, index) => <span key={index} style={{ "--bar": height, animationDelay: `${index * -90}ms` } as React.CSSProperties} />)}
+  </div>;
 }
 
-function BrandGlyph() {
-  return (
-    <span className="overlay-brand-glyph" aria-hidden="true">
-      <span />
-      <span />
-      <span />
-    </span>
-  );
-}
-
-function Waveform({ active }: { active: boolean }) {
-  return (
-    <div className={`overlay-waveform${active ? " active" : ""}`} aria-hidden="true">
-      {waveformBars.map((height, index) => (
-        <span key={height + index} style={{ height: `${height}%`, animationDelay: `${index * 45}ms` }} />
-      ))}
-    </div>
-  );
+function modeFor(state: string): WaveformMode {
+  if (state === "transcribing") return "processing";
+  if (state === "thinking") return "thinking";
+  if (state === "speaking") return "speaking";
+  return "listening";
 }
 
 function OverlayApp() {
   const { status, error, now } = useDesktopStatus();
-  const [dismissedAt, setDismissedAt] = useState(0);
-  const currentState: OverlayState = error ? "offline" : isOverlayState(status.status) ? status.status : "offline";
-  const copy = stateCopy[currentState];
-  const transcriptAge = status.updated_at > 0 ? now / 1000 - status.updated_at : Number.POSITIVE_INFINITY;
-  const hasFreshTranscript = Boolean(status.transcript && transcriptAge < 4);
-  const isExpanded =
-    currentState !== "armed" && currentState !== "offline"
-      ? status.updated_at > dismissedAt
-      : hasFreshTranscript && status.updated_at > dismissedAt;
-  const detail = error ? "The local status endpoint is unavailable" : status.detail || copy.detail;
-  const latestTranscript = status.transcript || "";
+  const state = error ? "error" : copy[status.status] ? status.status : "armed";
+  const [fading, setFading] = useState(false);
+  const age = now / 1000 - status.updated_at;
+  const visible = state !== "armed" && state !== "offline" && (state !== "success" && state !== "pasting" ? true : age < 1.6);
+  const message = error ? "Status unavailable" : status.detail || copy[state] || "Ready";
 
   useEffect(() => {
-    if (!isExpanded || currentState !== "pasting") return;
-    const timer = window.setTimeout(() => setDismissedAt(status.updated_at), 2600);
+    setFading(false);
+    if (state !== "success" && state !== "pasting") return;
+    const timer = window.setTimeout(() => setFading(true), 1150);
     return () => window.clearTimeout(timer);
-  }, [currentState, isExpanded, status.updated_at]);
+  }, [state, status.updated_at]);
 
-  return (
-    <main className="overlay-page">
-      <section className={`overlay-shell ${isExpanded ? "expanded" : "compact"} state-${currentState}`} aria-live="polite">
-        <header className="overlay-header">
-          <div className="overlay-brand">
-            <BrandGlyph />
-            <span>VA</span>
-          </div>
-          <div className="overlay-connection">
-            <span className="overlay-connection-dot" />
-            {error ? "LOCAL OFFLINE" : "LOCAL"}
-          </div>
-          {isExpanded && (
-            <button className="overlay-icon-button" onClick={() => setDismissedAt(status.updated_at)} type="button" aria-label="Collapse overlay">
-              <span aria-hidden="true">−</span>
-            </button>
-          )}
-        </header>
+  const content = useMemo(() => {
+    if (state === "success" || state === "pasting") return <span className="wispr-check" aria-label="Text pasted">✓</span>;
+    if (state === "error") return <><span className="wispr-error">!</span><span className="wispr-message">{message}</span></>;
+    return <Waveform mode={modeFor(state)} />;
+  }, [state, message]);
 
-        <div className="overlay-status-row">
-          <span className="overlay-status-mark" aria-hidden="true" />
-          <div>
-            <p className="overlay-eyebrow">{copy.eyebrow}</p>
-            <h1>{copy.title}</h1>
-          </div>
-        </div>
-
-        {isExpanded && (
-          <div className="overlay-body">
-            <p className="overlay-detail">{detail}</p>
-            <Waveform active={currentState === "listening"} />
-            {latestTranscript && (
-              <div className="overlay-transcript">
-                <span>LAST PHRASE</span>
-                <p>{latestTranscript}</p>
-              </div>
-            )}
-            {currentState === "error" || error ? (
-              <p className="overlay-error" role="alert">{status.detail || "Check the tray companion and local API."}</p>
-            ) : (
-              <div className="overlay-meta">
-                <span>{currentState === "listening" ? "MIC INPUT" : status.selected_language === "auto" ? "AUTO DETECT" : languageLabels[status.selected_language]}</span>
-                {status.detected_language && status.selected_language === "auto" && <span>DETECTED {languageLabels[status.detected_language]}</span>}
-                <span>{currentState === "listening" ? "LIVE" : "STT READY"}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <footer className="overlay-footer">
-          <span>{isExpanded ? "Win + Alt" : "Hold to dictate"}</span>
-          <a href="/" target="_blank" rel="noreferrer">Control panel <span aria-hidden="true">↗</span></a>
-        </footer>
-      </section>
-    </main>
-  );
+  if (!visible) return null;
+  return <main className={`overlay-page ${fading ? "fading" : ""}`} aria-live="polite"><section className="wispr-pill">{content}</section></main>;
 }
 
 export default OverlayApp;

@@ -213,15 +213,22 @@ class DesktopDictation:
     def _loop(self) -> None:
         while not self._stop.is_set():
             try:
-                target_window = self.injector.focused_window()
-                recording = self.recorder.record(on_started=self._on_recording_started)
+                target_window: int | None = None
+
+                def on_recording_started() -> None:
+                    nonlocal target_window
+                    target_window = self.injector.focused_window()
+                    self._on_recording_started()
+
+                recording = self.recorder.record(on_started=on_recording_started)
                 if self._stop.is_set():
                     break
                 self._process_recording(recording, target_window=target_window)
             except Exception as exc:
                 LOGGER.exception("Desktop dictation turn failed")
                 self._set_status(f"error: {exc}")
-                time.sleep(1)
+                # Keep the native error indicator on screen before returning idle.
+                self._stop.wait(3.6)
             finally:
                 if not self._stop.is_set():
                     self._set_status("armed")
@@ -235,8 +242,8 @@ class DesktopDictation:
             transcript = self._transcribe(audio_path)
             if not transcript:
                 raise DesktopDictationError("Speech recognition returned empty text")
-            self._set_status("pasting", transcript=transcript)
             self.injector.paste(transcript, target_window=target_window)
+            self._set_status("success", transcript=transcript)
         finally:
             audio_path.unlink(missing_ok=True)
 

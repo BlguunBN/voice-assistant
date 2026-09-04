@@ -6,7 +6,7 @@ from src.desktop.overlay import DesktopOverlayHost
 from src.desktop.status import DesktopStatusStore
 
 
-def test_native_host_expands_for_activity_and_collapses_after_paste(tmp_path: Path) -> None:
+def test_native_host_shows_active_states_and_hides_when_armed(tmp_path: Path) -> None:
     status_path = tmp_path / "desktop-status.json"
     store = DesktopStatusStore(status_path)
     host = DesktopOverlayHost(status_path)
@@ -14,13 +14,13 @@ def test_native_host_expands_for_activity_and_collapses_after_paste(tmp_path: Pa
     store.update("listening")
     host._sync_status()
     assert host._state == "listening"
-    assert host._expanded is True
+    assert host._should_show() is True
 
     store.update("armed")
     host._sync_status()
-    assert host._expanded is False
+    assert host._should_show() is False
 
-    store.update("pasting", transcript="Сайн байна уу")
+    store.update("success", transcript="Сайн байна уу")
     host._sync_status()
-    assert host._transcript == "Сайн байна уу"
-    assert host._expanded is True
+    assert host._state == "success"
+    assert host._should_show() is True
