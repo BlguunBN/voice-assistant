@@ -111,10 +111,73 @@ def test_clipboard_injector_restores_previous_text(monkeypatch):
         SimpleNamespace(paste=lambda: clipboard["value"], copy=lambda value: clipboard.update(value=value)),
     )
 
-    ClipboardTextInjector(paste_delay_seconds=0).paste("new text")
+    ClipboardTextInjector(paste_delay_seconds=0, clipboard_restore_delay_seconds=0).paste("new text")
 
     assert clipboard["value"] == "old"
     assert events == [(0x11, 0), (0x56, 0), (0x56, 2), (0x11, 2)]
+
+
+def test_clipboard_injector_waits_for_target_to_consume_paste_before_restoring(monkeypatch):
+    import ctypes
+
+    clipboard = {"value": "old"}
+    pauses: list[float] = []
+    consumed: list[str] = []
+
+    class FakeUser32:
+        def GetForegroundWindow(self):
+            return 7
+
+        def keybd_event(self, *_args):
+            return None
+
+    def sleep(seconds: float) -> None:
+        pauses.append(seconds)
+        if seconds == 0.4:
+            consumed.append(clipboard["value"])
+
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(user32=FakeUser32()), raising=False)
+    monkeypatch.setattr("src.desktop.injector.time.sleep", sleep)
+    monkeypatch.setitem(
+        sys.modules,
+        "pyperclip",
+        SimpleNamespace(paste=lambda: clipboard["value"], copy=lambda value: clipboard.update(value=value)),
+    )
+
+    ClipboardTextInjector(paste_delay_seconds=0.01, clipboard_restore_delay_seconds=0.4).paste("new text")
+
+    assert pauses[-1] == 0.4
+    assert consumed == ["new text"]
+    assert clipboard["value"] == "old"
+
+
+def test_clipboard_injector_does_not_overwrite_user_copy_during_settle_period(monkeypatch):
+    import ctypes
+
+    clipboard = {"value": "old"}
+
+    class FakeUser32:
+        def GetForegroundWindow(self):
+            return 7
+
+        def keybd_event(self, *_args):
+            return None
+
+    def sleep(seconds: float) -> None:
+        if seconds == 0.4:
+            clipboard["value"] = "user copied"
+
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(user32=FakeUser32()), raising=False)
+    monkeypatch.setattr("src.desktop.injector.time.sleep", sleep)
+    monkeypatch.setitem(
+        sys.modules,
+        "pyperclip",
+        SimpleNamespace(paste=lambda: clipboard["value"], copy=lambda value: clipboard.update(value=value)),
+    )
+
+    ClipboardTextInjector(paste_delay_seconds=0, clipboard_restore_delay_seconds=0.4).paste("new text")
+
+    assert clipboard["value"] == "user copied"
 def test_clipboard_injector_restores_captured_window_before_paste(monkeypatch):
     import ctypes
 
@@ -145,7 +208,7 @@ def test_clipboard_injector_restores_captured_window_before_paste(monkeypatch):
     )
 
     user32.foreground = 99
-    ClipboardTextInjector(paste_delay_seconds=0).paste("new text", target_window=7)
+    ClipboardTextInjector(paste_delay_seconds=0, clipboard_restore_delay_seconds=0).paste("new text", target_window=7)
 
     assert clipboard["value"] == "old"
     assert events[0] == ("focus", 7)

@@ -13,12 +13,19 @@ class TextInjectionError(RuntimeError):
 
 
 class ClipboardTextInjector:
-    """Paste text into the foreground window while restoring text clipboard contents."""
+    """Paste text and restore the clipboard after a configurable target-app settle period."""
 
-    def __init__(self, paste_delay_seconds: float = 0.08) -> None:
-        if paste_delay_seconds < 0:
-            raise ValueError("paste_delay_seconds must not be negative")
+    def __init__(
+        self,
+        paste_delay_seconds: float = 0.08,
+        clipboard_restore_delay_seconds: float = 0.35,
+    ) -> None:
+        if paste_delay_seconds < 0 or clipboard_restore_delay_seconds < 0:
+            raise ValueError("Clipboard delays must not be negative")
         self.paste_delay_seconds = paste_delay_seconds
+        # Keyboard paste is asynchronous in many Win32, Chromium, and Office apps.
+        # Keep dictated text available while their message queues process Ctrl+V.
+        self.clipboard_restore_delay_seconds = clipboard_restore_delay_seconds
 
     @staticmethod
     def _user32() -> Any:
@@ -63,11 +70,14 @@ class ClipboardTextInjector:
             if user32.GetForegroundWindow() != target_window:
                 raise TextInjectionError("The captured target window could not be focused")
             self._send_ctrl_v(user32)
-            time.sleep(self.paste_delay_seconds)
+            time.sleep(self.clipboard_restore_delay_seconds)
         finally:
             if previous_text is not None:
                 try:
-                    pyperclip.copy(previous_text)
+                    # Do not replace something the user copied while the target was
+                    # processing the asynchronous paste.
+                    if pyperclip.paste() == text:
+                        pyperclip.copy(previous_text)
                 except (pyperclip.PyperclipException, OSError, RuntimeError):
                     LOGGER.warning("Unable to restore the previous text clipboard")
 
