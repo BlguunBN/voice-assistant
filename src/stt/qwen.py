@@ -126,7 +126,8 @@ class QwenSTTEngine:
             result = str(parsed.get("transcription", "")).strip()
             if not result:
                 raise STTError("English STT returned empty text")
-            self.last_detected_language = str(parsed.get("language") or "").lower() or None
+            detected = str(parsed.get("language") or "").strip().lower()
+            self.last_detected_language = {"english": "en", "mongolian": "mn"}.get(detected, detected or None)
             return result
         except STTError:
             raise

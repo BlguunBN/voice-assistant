@@ -46,3 +46,4 @@ def test_qwen_decodes_local_audio_before_calling_the_processor(tmp_path: Path):
     assert engine.transcribe(path, language="en") == "Hello world"
     assert isinstance(processor.audio, np.ndarray)
     assert processor.audio.shape == (16_000,)
+    assert engine.last_detected_language == "en"

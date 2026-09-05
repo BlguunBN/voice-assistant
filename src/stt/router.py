@@ -63,7 +63,7 @@ class STTLanguageRouter:
             # class. Any other result is safely routed to the Mongolian model.
             self._activate(self._english)
             english_text = self._english.transcribe(audio, language="auto")
-            if str(getattr(self._english, "last_detected_language", "") or "").lower() == "english":
+            if str(getattr(self._english, "last_detected_language", "") or "").lower() == "en":
                 return english_text
             self._activate(self._mongolian)
             return self._mongolian.transcribe(audio, language="mn")

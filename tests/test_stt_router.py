@@ -22,7 +22,7 @@ class FakeEngine:
 
     def transcribe(self, _audio: Path, *, language: str) -> str:
         self.languages.append(language)
-        self.last_detected_language = "English" if language == "auto" else language
+        self.last_detected_language = "en" if language == "auto" else language
         return "Hello" if language in {"en", "auto"} else "Сайн байна уу"
 
 
