@@ -82,6 +82,12 @@ class STTEngine:
         except STTError:
             raise
         except Exception as exc:
+            if self.device == "cuda" and "out of memory" in str(exc).lower():
+                LOGGER.warning("CUDA OOM while loading STT; unloading and retrying on CPU")
+                self.unload()
+                self._forced_device = "cpu"
+                self.load()
+                return
             self.unload()
             raise STTError(f"Unable to load STT model: {exc}") from exc
 
