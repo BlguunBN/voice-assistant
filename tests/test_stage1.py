@@ -46,8 +46,8 @@ class FakeModel:
 def test_default_config_resolves_runtime_paths_from_repository_root():
     config = load_config()
 
-    assert config.stt_model_id == "openai/whisper-large-v3-turbo"
-    assert config.stt_local_path == Path("D:/AI/models/stt/whisper-large-v3-turbo").resolve()
+    assert config.stt_model_id == "Blgn94/whisper-small-mn-v3"
+    assert config.stt_local_path == Path("D:/AI/models/stt/whisper-small-mn-v3").resolve()
     assert config.huggingface_cache == config.project_root / "huggingface" / "hub"
     assert config.stt_sample_rate == 16_000
     assert config.tts_english_device == "cuda"
@@ -150,7 +150,7 @@ def test_missing_audio_is_readable_error():
 
     with pytest.raises(STTError, match="Audio file not found"):
         engine.transcribe("missing.wav")
-def test_transcribe_passes_explicit_language_to_whisper_generate():
+def test_transcribe_ignores_explicit_english_and_forces_mongolian_generation():
     config = load_config()
     engine = STTEngine(config)
     engine._processor = FakeProcessor()
@@ -168,11 +168,11 @@ def test_transcribe_passes_explicit_language_to_whisper_generate():
     result = engine.transcribe(np.zeros(16_000, dtype=np.float32), language="en")
 
     assert result == "Монгол хэлний тест"
-    assert captured["language"] == "en"
+    assert captured["language"] == "mn"
 
-def test_auto_mode_leaves_language_unset_and_keeps_transcription_task():
+def test_mongolian_mode_always_forces_transcription_language():
     config = load_config()
-    engine = STTEngine(config, language="auto")
+    engine = STTEngine(config, language="mn")
     engine._processor = FakeProcessor()
     captured: dict[str, object] = {}
 
@@ -187,5 +187,5 @@ def test_auto_mode_leaves_language_unset_and_keeps_transcription_task():
 
     engine.transcribe(np.zeros(16_000, dtype=np.float32))
 
-    assert "language" not in captured
+    assert captured["language"] == "mn"
     assert captured["task"] == "transcribe"

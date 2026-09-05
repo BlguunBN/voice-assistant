@@ -96,13 +96,9 @@ function App() {
   const [microphoneId, setMicrophoneId] = useState(() => localStorage.getItem("voice-assistant.microphone") ?? "");
   const [speakerId, setSpeakerId] = useState(() => localStorage.getItem("voice-assistant.speaker") ?? "");
   const [voiceId, setVoiceId] = useState(() => localStorage.getItem("voice-assistant.voice") ?? "");
-  const [language, setLanguage] = useState<TranscriptionLanguage>(() => {
-    const stored = localStorage.getItem("voice-assistant.language");
-    return stored === "mn" || stored === "en" || stored === "auto" ? stored : "mn";
-  });
+  const [language, setLanguage] = useState<TranscriptionLanguage>("mn");
   const [desktopLanguage, setDesktopLanguage] = useState<DesktopLanguage>(() => {
-    const stored = localStorage.getItem("voice-assistant.desktop-language");
-    return stored === "mn" || stored === "en" || stored === "auto" ? stored : "auto";
+    return "mn";
   });
   const [desktopPreferenceError, setDesktopPreferenceError] = useState<string | null>(null);
   const [voices, setVoices] = useState<string[]>([]);
@@ -138,7 +134,7 @@ function App() {
     let active = true;
     void getDesktopPreferences()
       .then((preferences) => {
-        if (active) setDesktopLanguage(preferences.selected_language);
+        if (active) setDesktopLanguage("mn");
       })
       .catch(() => undefined);
     return () => {
@@ -348,10 +344,8 @@ function App() {
           <section className="rail-section compact-controls">
             <label className="field">
               <span>Dictation language</span>
-              <select value={desktopLanguage} onChange={(event) => handleDesktopLanguageChange(event.target.value as DesktopLanguage)}>
+              <select value="mn" disabled>
                 <option value="mn">Монгол</option>
-                <option value="en">English</option>
-                <option value="auto">Auto detect</option>
               </select>
             </label>
             <div className="desktop-status" aria-live="polite">
@@ -363,10 +357,10 @@ function App() {
             </div>
             {desktopPreferenceError && <p className="inline-error">Language preference unavailable: {desktopPreferenceError}</p>}
             <div className="section-heading"><span className="eyebrow">Conversation language</span></div>
-            <label className="field"><span className="sr-only">Conversation language</span><select value={language} onChange={(event) => setLanguage(event.target.value as TranscriptionLanguage)}><option value="mn">Монгол</option><option value="en">English</option><option value="auto">Auto detect</option></select></label>
+            <label className="field"><span className="sr-only">Conversation language</span><select value="mn" disabled><option value="mn">Монгол</option></select></label>
             <div className="section-heading"><span className="eyebrow">Speech output</span><span className="count-badge">{language === "mn" ? voices.length : 1}</span></div>
             <label className="field"><span>Voice</span><select disabled={language !== "mn"} value={language === "mn" ? selectedVoice : ""} onChange={(event) => setVoiceId(event.target.value)}><option value="">{language === "mn" ? "Default voice" : "Detected language voice"}</option>{voices.map((voice) => <option value={voice} key={voice}>{voice}</option>)}</select></label>
-            <p className="muted">{language === "auto" ? "Whisper chooses Mongolian or English for each recording." : language === "en" ? "English uses the local default voice." : speakerSupported ? "Selected speaker is used for TTS playback." : "Browser speaker routing unavailable."}</p>
+            <p className="muted">{language === "en" ? "English uses the local default voice." : speakerSupported ? "Selected speaker is used for TTS playback." : "Browser speaker routing unavailable."}</p>
           </section>
         </aside>
       </div>

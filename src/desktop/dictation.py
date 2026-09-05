@@ -185,10 +185,8 @@ class DesktopDictation:
         return f"http://{self.config.api_host}:{self.config.api_port}/stt"
 
     def _selected_language(self) -> str:
-        store = getattr(self, "preferences_store", None)
-        if store is not None:
-            return store.read().selected_language
-        return self.config.desktop_language
+        # Desktop dictation is intentionally Mongolian-only.
+        return "mn"
 
     def _set_status(
         self,
@@ -324,7 +322,9 @@ class DesktopDictation:
         if not isinstance(transcript, str):
             raise DesktopDictationError("STT API returned an invalid transcript")
         detected_language = payload.get("detected_language")
-        if detected_language in {"mn", "en"}:
+        if selected_language == "mn":
+            self._last_detected_language = "mn"
+        elif detected_language in {"mn", "en"}:
             self._last_detected_language = detected_language
         elif selected_language in {"mn", "en"}:
             self._last_detected_language = selected_language

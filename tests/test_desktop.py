@@ -74,7 +74,7 @@ def test_config_exposes_desktop_dictation_defaults():
     config = load_config()
 
     assert config.desktop_hotkey == "ctrl+alt"
-    assert config.desktop_language == "auto"
+    assert config.desktop_language == "mn"
 
 
 def test_desktop_transcribe_posts_multipart_audio(monkeypatch, tmp_path: Path):
@@ -103,12 +103,12 @@ def test_desktop_transcribe_posts_multipart_audio(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(dictation_module.urllib_request, "urlopen", fake_urlopen)
 
     assert engine._transcribe(audio_path) == "Сайн байна уу"
-    assert engine._last_detected_language == "en"
+    assert engine._last_detected_language == "mn"
     request = captured["request"]
     assert request.full_url.endswith("/stt")
     assert request.headers["Content-type"].startswith("multipart/form-data; boundary=")
     assert b'name="language"' in request.data
-    assert b"\r\nauto\r\n" in request.data
+    assert b"\r\nmn\r\n" in request.data
     assert b"dictation.wav" in request.data
     assert b"RIFF-test" in request.data
 

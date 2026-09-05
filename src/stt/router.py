@@ -11,7 +11,7 @@ STTLanguage = Literal["mn", "en", "auto"]
 
 
 class STTLanguageRouter:
-    """Compatibility facade around exactly one multilingual STT engine."""
+    """Compatibility facade around one dedicated Mongolian STT engine."""
 
     def __init__(self, config: AppConfig, *, engine: STTEngine | None = None) -> None:
         self._engine = engine or STTEngine(config, language="auto")

@@ -10,9 +10,9 @@ storage:
   huggingface_cache: 'huggingface/hub'
 
 stt:
-  # One multilingual resident model for Mongolian, English, and auto detection.
-  model: 'openai/whisper-large-v3-turbo'
-  local_path: 'D:/AI/models/stt/whisper-large-v3-turbo'
+  # Dedicated Mongolian STT model. All STT requests transcribe as Mongolian.
+  model: 'Blgn94/whisper-small-mn-v3'
+  local_path: 'D:/AI/models/stt/whisper-small-mn-v3'
   device: cuda
   fallback_device: cpu
   sample_rate: 16000
@@ -55,7 +55,7 @@ audio:
 
 desktop:
   hotkey: 'ctrl+alt'
-  language: auto
+  language: mn
 
 vad:
   enabled: true

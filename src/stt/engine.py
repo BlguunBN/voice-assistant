@@ -193,13 +193,12 @@ class STTEngine:
         if self.device == "cuda":
             torch.cuda.synchronize()
         started = time.perf_counter()
-        kwargs: dict[str, Any] = {"max_new_tokens": self.config.stt_max_new_tokens, "task": "transcribe"}
-        if language in _SUPPORTED_LANGUAGES:
-            kwargs["language"] = language
-        else:
-            generation_config = self._auto_generation_config()
-            if generation_config is not None:
-                kwargs["generation_config"] = generation_config
+        # This application intentionally uses the dedicated Mongolian model only.
+        kwargs: dict[str, Any] = {
+            "max_new_tokens": self.config.stt_max_new_tokens,
+            "task": "transcribe",
+            "language": "mn",
+        }
         with torch.inference_mode():
             generated_ids, detected_language = self._generate_with_detected_language(
                 model_inputs, kwargs
@@ -209,24 +208,23 @@ class STTEngine:
         self.last_latency_seconds = time.perf_counter() - started
         self.last_real_time_factor = self.last_latency_seconds / self.last_audio_duration_seconds if self.last_audio_duration_seconds else None
         self.last_peak_vram_bytes = int(torch.cuda.max_memory_allocated()) if self.device == "cuda" else None
-        detected = (
-            language
-            if language in _SUPPORTED_LANGUAGES
-            else detected_language or self._detected_language_from_ids(generated_ids)
-        )
-        if language == "auto" and detected not in _SUPPORTED_LANGUAGES:
-            raise STTError("Whisper detected an unsupported language; only Mongolian and English are accepted")
-        self.last_detected_language = detected
+        self.last_detected_language = "mn"
         result = str(self._processor.batch_decode(generated_ids, skip_special_tokens=True)[0]).strip()
         if not result:
             raise STTError("STT returned empty text")
-        LOGGER.info("STT latency_seconds=%.3f audio_seconds=%.3f rtf=%.3f detected_language=%s", self.last_latency_seconds, self.last_audio_duration_seconds or 0.0, self.last_real_time_factor or 0.0, detected)
+        LOGGER.info(
+            "STT latency_seconds=%.3f audio_seconds=%.3f rtf=%.3f detected_language=%s",
+            self.last_latency_seconds,
+            self.last_audio_duration_seconds or 0.0,
+            self.last_real_time_factor or 0.0,
+            self.last_detected_language,
+        )
         return result
 
     def transcribe(self, audio: str | os.PathLike[str] | np.ndarray, language: STTLanguage | None = None) -> str:
-        requested: STTLanguage = language or self.language
-        if requested not in {"mn", "en", "auto"}:
-            raise STTError(f"Unsupported STT language: {requested}")
+        requested: STTLanguage = "mn"
+        if language not in {None, "mn"}:
+            LOGGER.info("Ignoring requested STT language=%s; Mongolian-only mode is enabled", language)
         self.load()
         samples = self._read_audio(audio)
         self.last_audio_duration_seconds = samples.size / self.config.stt_sample_rate

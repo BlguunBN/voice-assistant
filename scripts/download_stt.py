@@ -12,7 +12,7 @@ from src.core.config import load_config
 
 
 def _targets(config, _language: str) -> list[tuple[str, Path]]:
-    """Every language option maps to the one multilingual Whisper download."""
+    """Every compatibility option maps to the dedicated Mongolian Whisper download."""
     return [(config.stt_model_id, config.stt_local_path)]
 
 
@@ -22,7 +22,7 @@ def main() -> None:
         "--language",
         choices=("mn", "en", "auto", "all"),
         default="mn",
-        help="Compatibility option; every choice downloads the shared multilingual model",
+        help="Compatibility option; every choice downloads the Mongolian model",
     )
     args = parser.parse_args()
     config = load_config(ROOT / "config" / "config.yaml")
