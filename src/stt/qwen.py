@@ -6,6 +6,9 @@ import gc
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import soundfile as sf
+
 from src.core.config import AppConfig
 from .engine import STTError
 
@@ -80,6 +83,25 @@ class QwenSTTEngine:
         except ImportError:
             pass
 
+    def _read_audio(self, path: Path) -> np.ndarray:
+        try:
+            samples, sample_rate = sf.read(path, dtype="float32", always_2d=False)
+        except Exception as exc:
+            raise STTError(f"Unable to read audio file {path}: {exc}") from exc
+        waveform = np.asarray(samples, dtype=np.float32)
+        if waveform.ndim == 2:
+            waveform = waveform.mean(axis=1)
+        if waveform.ndim != 1 or waveform.size == 0:
+            raise STTError("Audio must contain a non-empty waveform")
+        if sample_rate == self.config.stt_sample_rate:
+            return waveform
+        target_length = max(1, round(waveform.size * self.config.stt_sample_rate / sample_rate))
+        return np.interp(
+            np.linspace(0, waveform.size - 1, target_length),
+            np.arange(waveform.size),
+            waveform,
+        ).astype(np.float32)
+
     def transcribe(self, audio: str | Path, *, language: str = "en") -> str:
         self.load()
         path = Path(audio)
@@ -88,7 +110,10 @@ class QwenSTTEngine:
         try:
             import torch
 
-            request: dict[str, object] = {"audio": str(path)}
+            # Passing a filesystem path makes Transformers invoke TorchCodec.
+            # Decode with the project's SoundFile dependency instead so Windows
+            # users do not need matching TorchCodec and FFmpeg DLLs.
+            request: dict[str, object] = {"audio": self._read_audio(path)}
             if language == "en":
                 request["language"] = "English"
             elif language != "auto":
