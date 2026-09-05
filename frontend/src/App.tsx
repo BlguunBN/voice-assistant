@@ -1,5 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { getDesktopPreferences, getVoices, updateDesktopPreferences } from "./api/client";
+import {
+  getDesktopPreferences,
+  getVoices,
+  updateDesktopPreferences,
+  type TranscriptionLanguage,
+} from "./api/client";
 import { useAssistant } from "./hooks/useAssistant";
 import { useAudioDevices } from "./hooks/useAudioDevices";
 import { useDesktopStatus } from "./hooks/useDesktopStatus";
@@ -36,7 +41,7 @@ function StatusCard({ label, value, active = false }: { label: string; value: st
   );
 }
 
-function MessageList({ messages, language }: { messages: VoiceMessage[]; language: "mn" | "en" }) {
+function MessageList({ messages, language }: { messages: VoiceMessage[]; language: TranscriptionLanguage }) {
   if (messages.length === 0) {
     return (
       <div className="empty-state">
@@ -91,7 +96,10 @@ function App() {
   const [microphoneId, setMicrophoneId] = useState(() => localStorage.getItem("voice-assistant.microphone") ?? "");
   const [speakerId, setSpeakerId] = useState(() => localStorage.getItem("voice-assistant.speaker") ?? "");
   const [voiceId, setVoiceId] = useState(() => localStorage.getItem("voice-assistant.voice") ?? "");
-  const [language, setLanguage] = useState<"mn" | "en">(() => (localStorage.getItem("voice-assistant.language") as "mn" | "en" | null) ?? "mn");
+  const [language, setLanguage] = useState<TranscriptionLanguage>(() => {
+    const stored = localStorage.getItem("voice-assistant.language");
+    return stored === "mn" || stored === "en" || stored === "auto" ? stored : "mn";
+  });
   const [desktopLanguage, setDesktopLanguage] = useState<DesktopLanguage>(() => {
     const stored = localStorage.getItem("voice-assistant.desktop-language");
     return stored === "mn" || stored === "en" || stored === "auto" ? stored : "auto";
@@ -355,10 +363,10 @@ function App() {
             </div>
             {desktopPreferenceError && <p className="inline-error">Language preference unavailable: {desktopPreferenceError}</p>}
             <div className="section-heading"><span className="eyebrow">Conversation language</span></div>
-            <label className="field"><span className="sr-only">Conversation language</span><select value={language} onChange={(event) => setLanguage(event.target.value as "mn" | "en")}><option value="mn">Монгол</option><option value="en">English</option></select></label>
+            <label className="field"><span className="sr-only">Conversation language</span><select value={language} onChange={(event) => setLanguage(event.target.value as TranscriptionLanguage)}><option value="mn">Монгол</option><option value="en">English</option><option value="auto">Auto detect</option></select></label>
             <div className="section-heading"><span className="eyebrow">Speech output</span><span className="count-badge">{language === "mn" ? voices.length : 1}</span></div>
-            <label className="field"><span>Voice</span><select disabled={language === "en"} value={language === "mn" ? selectedVoice : ""} onChange={(event) => setVoiceId(event.target.value)}><option value="">{language === "mn" ? "Default voice" : "English default"}</option>{voices.map((voice) => <option value={voice} key={voice}>{voice}</option>)}</select></label>
-            <p className="muted">{language === "en" ? "English uses the local default voice." : speakerSupported ? "Selected speaker is used for TTS playback." : "Browser speaker routing unavailable."}</p>
+            <label className="field"><span>Voice</span><select disabled={language !== "mn"} value={language === "mn" ? selectedVoice : ""} onChange={(event) => setVoiceId(event.target.value)}><option value="">{language === "mn" ? "Default voice" : "Detected language voice"}</option>{voices.map((voice) => <option value={voice} key={voice}>{voice}</option>)}</select></label>
+            <p className="muted">{language === "auto" ? "Whisper chooses Mongolian or English for each recording." : language === "en" ? "English uses the local default voice." : speakerSupported ? "Selected speaker is used for TTS playback." : "Browser speaker routing unavailable."}</p>
           </section>
         </aside>
       </div>

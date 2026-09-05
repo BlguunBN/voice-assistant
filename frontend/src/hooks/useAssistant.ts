@@ -1,5 +1,11 @@
 import { useCallback, useRef, useState, type RefObject } from "react";
-import { chat, synthesize, transcribe, type ConversationLanguage } from "../api/client";
+import {
+  chat,
+  synthesize,
+  transcribe,
+  type ConversationLanguage,
+  type TranscriptionLanguage,
+} from "../api/client";
 import { encodeWav, mergeFloat32Chunks } from "../audio/wav";
 import type { AssistantStatus, VoiceMessage } from "../types";
 
@@ -15,7 +21,7 @@ type Recorder = {
 type AssistantOptions = {
   microphoneId: string;
   voiceId: string;
-  language: ConversationLanguage;
+  language: TranscriptionLanguage;
   audioRef: RefObject<HTMLAudioElement | null>;
 };
 
@@ -63,7 +69,10 @@ export function useAssistant({ microphoneId, voiceId, language, audioRef }: Assi
     ]);
   }, []);
 
-  const runConversation = useCallback(async (message: string) => {
+  const runConversation = useCallback(async (
+    message: string,
+    detectedLanguage?: ConversationLanguage,
+  ) => {
     const normalized = message.trim();
     if (!normalized) return;
     const startedAt = performance.now();
@@ -71,10 +80,15 @@ export function useAssistant({ microphoneId, voiceId, language, audioRef }: Assi
     setStatus("processing");
     appendMessage("user", normalized);
     try {
-      const response = await chat(normalized, language);
+      const responseLanguage = detectedLanguage ?? (language === "auto" ? "mn" : language);
+      const response = await chat(normalized, responseLanguage);
       appendMessage("assistant", response);
       setStatus("speaking");
-      const audio = await synthesize(response, language === "mn" ? voiceId || undefined : undefined, language);
+      const audio = await synthesize(
+        response,
+        responseLanguage === "mn" ? voiceId || undefined : undefined,
+        responseLanguage,
+      );
       setLatencyMs(Math.round(performance.now() - startedAt));
       await playAudio(audio);
       setStatus("ready");
@@ -138,8 +152,8 @@ export function useAssistant({ microphoneId, voiceId, language, audioRef }: Assi
     }
     setStatus("processing");
     try {
-      const transcript = await transcribe(encodeWav(samples, recorder.context.sampleRate), language);
-      await runConversation(transcript);
+      const result = await transcribe(encodeWav(samples, recorder.context.sampleRate), language);
+      await runConversation(result.transcript, result.detected_language);
     } catch (requestError) {
       setStatus("error");
       setError(requestError instanceof Error ? requestError.message : "Transcription failed.");

@@ -3,6 +3,11 @@ import type { DesktopLanguage, DesktopStatus, Health } from "../types";
 export type ConversationLanguage = "mn" | "en";
 export type TranscriptionLanguage = ConversationLanguage | "auto";
 
+export type TranscriptionResult = {
+  transcript: string;
+  detected_language?: ConversationLanguage;
+};
+
 const API_PREFIX = "/api";
 
 async function parseError(response: Response): Promise<Error> {
@@ -46,15 +51,17 @@ export async function getVoices(): Promise<string[]> {
   const body = await request<{ voices: string[] }>("/voices");
   return body.voices;
 }
-export async function transcribe(audio: Blob, language: TranscriptionLanguage = "mn"): Promise<string> {
+export async function transcribe(
+  audio: Blob,
+  language: TranscriptionLanguage = "mn",
+): Promise<TranscriptionResult> {
   const form = new FormData();
   form.append("file", audio, "browser-recording.wav");
   form.append("language", language);
-  const body = await request<{ transcript: string }>("/stt", {
+  return request<TranscriptionResult>("/stt", {
     method: "POST",
     body: form,
   });
-  return body.transcript;
 }
 
 export async function chat(message: string, language: ConversationLanguage = "mn"): Promise<string> {
