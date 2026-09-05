@@ -71,7 +71,9 @@ class STTEngine:
             self.device = self._choose_device()
             dtype = torch.float16 if self.device == "cuda" else torch.float32
             self._processor = AutoProcessor.from_pretrained(str(self.model_path), local_files_only=True, extra_special_tokens={})
-            self._model = WhisperForConditionalGeneration.from_pretrained(str(self.model_path), local_files_only=True, torch_dtype=dtype)
+            self._model = WhisperForConditionalGeneration.from_pretrained(
+                str(self.model_path), local_files_only=True, dtype=dtype
+            )
             self._model.to(self.device)
             self._model.eval()
             self.loaded = True
