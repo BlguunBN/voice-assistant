@@ -3,6 +3,7 @@ from __future__ import annotations
 import gc
 import logging
 import os
+from copy import copy
 from pathlib import Path
 import time
 from typing import Any, Literal, Mapping
@@ -167,6 +168,24 @@ class STTEngine:
         finally:
             self._model.detect_language = detect_language
 
+    def _auto_generation_config(self) -> Any | None:
+        """Restrict Whisper's auto detector to the two languages this app serves."""
+        configured = getattr(self._model, "generation_config", None)
+        language_ids = getattr(configured, "lang_to_id", None)
+        if configured is None or not isinstance(language_ids, dict):
+            return None
+        supported = {
+            token: token_id
+            for token, token_id in language_ids.items()
+            if str(token).strip("<|>").lower() in _SUPPORTED_LANGUAGES
+        }
+        if set(str(token).strip("<|>").lower() for token in supported) != _SUPPORTED_LANGUAGES:
+            raise STTError("Whisper model does not provide both Mongolian and English language tokens")
+        generation_config = copy(configured)
+        generation_config.language = None
+        generation_config.lang_to_id = supported
+        return generation_config
+
     def _transcribe_loaded(self, audio: np.ndarray, language: STTLanguage) -> str:
         import torch
         inputs = self._processor(audio, sampling_rate=self.config.stt_sample_rate, return_tensors="pt", return_attention_mask=True)
@@ -177,6 +196,10 @@ class STTEngine:
         kwargs: dict[str, Any] = {"max_new_tokens": self.config.stt_max_new_tokens, "task": "transcribe"}
         if language in _SUPPORTED_LANGUAGES:
             kwargs["language"] = language
+        else:
+            generation_config = self._auto_generation_config()
+            if generation_config is not None:
+                kwargs["generation_config"] = generation_config
         with torch.inference_mode():
             generated_ids, detected_language = self._generate_with_detected_language(
                 model_inputs, kwargs

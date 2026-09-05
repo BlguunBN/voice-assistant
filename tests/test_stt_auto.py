@@ -35,6 +35,10 @@ class AutoModel:
 
 
 class InternalDetectModel(AutoModel):
+    generation_config = type(
+        "GenerationConfig", (), {"language": None, "lang_to_id": {"<|mn|>": 41, "<|en|>": 42, "<|fr|>": 99}}
+    )()
+
     def detect_language(self, **_kwargs):
         return torch.tensor([41])
 
@@ -66,6 +70,7 @@ def test_auto_detection_uses_whisper_internal_detection_when_ids_omit_language()
 
     assert engine.transcribe(np.zeros(16_000, dtype=np.float32), language="auto") == "test transcript"
     assert engine.last_detected_language == "mn"
+    assert engine._model.kwargs["generation_config"].lang_to_id == {"<|mn|>": 41, "<|en|>": 42}
 
 
 def test_desktop_language_defaults_to_auto():
