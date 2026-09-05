@@ -10,6 +10,11 @@ from src.stt.engine import STTEngine, STTError
 
 
 class FakeProcessor:
+    class tokenizer:
+        @staticmethod
+        def convert_ids_to_tokens(token_id: int) -> str:
+            return "<|mn|>" if token_id == 2 else "<|startoftranscript|>"
+
     def __call__(self, audio, *, sampling_rate, return_tensors, return_attention_mask):
         assert sampling_rate == 16_000
         assert return_tensors == "pt"
@@ -41,10 +46,8 @@ class FakeModel:
 def test_default_config_resolves_runtime_paths_from_repository_root():
     config = load_config()
 
-    assert config.stt_model_id == "Blgn94/whisper-small-mn-v3"
-    assert config.stt_local_path == config.project_root / "models" / "stt" / "whisper-small-mn-v3"
-    assert config.stt_english_model_id == "openai/whisper-tiny.en"
-    assert config.stt_english_local_path == config.project_root / "models" / "stt" / "whisper-tiny.en"
+    assert config.stt_model_id == "openai/whisper-large-v3-turbo"
+    assert config.stt_local_path == Path("D:/AI/models/stt/whisper-large-v3-turbo").resolve()
     assert config.huggingface_cache == config.project_root / "huggingface" / "hub"
     assert config.stt_sample_rate == 16_000
     assert config.tts_english_device == "cuda"
@@ -167,9 +170,9 @@ def test_transcribe_passes_explicit_language_to_whisper_generate():
     assert result == "Монгол хэлний тест"
     assert captured["language"] == "en"
 
-def test_english_only_model_omits_language_and_task_generation_options():
+def test_auto_mode_leaves_language_unset_and_keeps_transcription_task():
     config = load_config()
-    engine = STTEngine(config, language="en")
+    engine = STTEngine(config, language="auto")
     engine._processor = FakeProcessor()
     captured: dict[str, object] = {}
 
@@ -185,4 +188,4 @@ def test_english_only_model_omits_language_and_task_generation_options():
     engine.transcribe(np.zeros(16_000, dtype=np.float32))
 
     assert "language" not in captured
-    assert "task" not in captured
+    assert captured["task"] == "transcribe"

@@ -10,12 +10,9 @@ storage:
   huggingface_cache: 'huggingface/hub'
 
 stt:
-  model: 'Blgn94/whisper-small-mn-v3'
-  local_path: 'models/stt/whisper-small-mn-v3'
-  english_model: 'openai/whisper-tiny.en'
-  english_local_path: 'models/stt/whisper-tiny.en'
-  auto_model: 'openai/whisper-tiny'
-  auto_local_path: 'models/stt/whisper-tiny-auto'
+  # One multilingual resident model for Mongolian, English, and auto detection.
+  model: 'openai/whisper-large-v3-turbo'
+  local_path: 'D:/AI/models/stt/whisper-large-v3-turbo'
   device: cuda
   fallback_device: cpu
   sample_rate: 16000

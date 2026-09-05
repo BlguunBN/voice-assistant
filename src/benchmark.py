@@ -99,6 +99,9 @@ def run_benchmark(config: AppConfig, audio_path: str | Path | None = None, itera
             "average_total_seconds": round((sum(stt_times) + sum(tts_times)) / iterations, 3),
             "average_audio_duration_seconds": round(sum(durations) / iterations, 3),
             "stt_device": stt.device,
+            "detected_language": stt.last_detected_language,
+            "stt_real_time_factor": round(stt.last_real_time_factor, 3) if stt.last_real_time_factor is not None else None,
+            "stt_peak_vram_mib": round(stt.last_peak_vram_bytes / 1024**2, 1) if stt.last_peak_vram_bytes is not None else None,
             "tts_device": config.tts_device,
             "memory": memory,
         }

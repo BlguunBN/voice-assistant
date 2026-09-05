@@ -35,7 +35,7 @@ npm install
 Pop-Location
 ```
 
-Review `config/config.yaml`. The default configuration uses the bundled Edge Mongolian voice provider and relative paths under the repository. Download local Hugging Face models only when you need them:
+Review `config/config.yaml`. The default STT configuration uses one multilingual `openai/whisper-large-v3-turbo` snapshot at `D:/AI/models/stt/whisper-large-v3-turbo`; it serves Mongolian, English, and auto-detect mode without model switching. Download it once when needed:
 
 ```powershell
 .venv\Scripts\python.exe scripts\download_stt.py

@@ -11,18 +11,9 @@ sys.path.insert(0, str(ROOT))
 from src.core.config import load_config
 
 
-def _targets(config, language: str) -> list[tuple[str, Path]]:
-    if language == "mn":
-        return [(config.stt_model_id, config.stt_local_path)]
-    if language == "en":
-        return [(config.stt_english_model_id, config.stt_english_local_path)]
-    if language == "auto":
-        return [(config.stt_auto_model_id, config.stt_auto_local_path)]
-    return [
-        (config.stt_model_id, config.stt_local_path),
-        (config.stt_english_model_id, config.stt_english_local_path),
-        (config.stt_auto_model_id, config.stt_auto_local_path),
-    ]
+def _targets(config, _language: str) -> list[tuple[str, Path]]:
+    """Every language option maps to the one multilingual Whisper download."""
+    return [(config.stt_model_id, config.stt_local_path)]
 
 
 def main() -> None:
@@ -31,7 +22,7 @@ def main() -> None:
         "--language",
         choices=("mn", "en", "auto", "all"),
         default="mn",
-        help="Model to download (default: mn)",
+        help="Compatibility option; every choice downloads the shared multilingual model",
     )
     args = parser.parse_args()
     config = load_config(ROOT / "config" / "config.yaml")
@@ -43,7 +34,7 @@ def main() -> None:
             repo_id=model_id,
             local_dir=str(model_path),
             cache_dir=str(config.huggingface_cache),
-            allow_patterns=["*.json", "*.txt", "*.safetensors", ".gitattributes"],
+            allow_patterns=["*.json", "*.txt", "*.safetensors", "*.bin", ".gitattributes"],
             max_workers=4,
         )
         print(location)

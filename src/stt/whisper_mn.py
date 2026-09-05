@@ -6,6 +6,6 @@ share the lifecycle and audio contract without changing the CLI.
 
 from .engine import STTError, STTEngine
 
-MODEL_ID = "Blgn94/whisper-small-mn-v3"
+MODEL_ID = "openai/whisper-large-v3-turbo"
 
 __all__ = ["MODEL_ID", "STTError", "STTEngine"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,8 @@ from typing import Any
 
 import yaml
 from dotenv import load_dotenv
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ConfigError(ValueError):
@@ -47,27 +50,6 @@ class AppConfig:
     @property
     def stt_model_id(self) -> str:
         return str(self.data["stt"]["model"])
-
-    @property
-    def stt_english_model_id(self) -> str:
-        return str(self.data["stt"].get("english_model", "openai/whisper-small.en"))
-
-    @property
-    def stt_english_local_path(self) -> Path:
-        value = self.data["stt"].get("english_local_path")
-        if value is None:
-            return self.stt_local_path.parent / "whisper-small.en"
-        return self._path("stt", "english_local_path")
-    @property
-    def stt_auto_model_id(self) -> str:
-        return str(self.data["stt"].get("auto_model", "openai/whisper-tiny"))
-
-    @property
-    def stt_auto_local_path(self) -> Path:
-        value = self.data["stt"].get("auto_local_path")
-        if value is None:
-            return self.stt_local_path.parent / "whisper-tiny-auto"
-        return self._path("stt", "auto_local_path")
 
     @property
     def stt_local_path(self) -> Path:
@@ -313,8 +295,6 @@ class AppConfig:
             raise ConfigError("stt.max_new_tokens must be positive")
         if not self.stt_model_id.strip():
             raise ConfigError("stt.model must be non-empty")
-        if not self.stt_english_model_id.strip():
-            raise ConfigError("stt.english_model must be non-empty")
         if not self.tts_model_id.strip():
             raise ConfigError("tts.model must be non-empty")
         if self.tts_provider not in {"local", "edge"}:
@@ -397,6 +377,12 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         raise ConfigError(f"Invalid YAML in {config_path}: {exc}") from exc
     if not isinstance(raw, dict):
         raise ConfigError(f"Configuration root must be a mapping: {config_path}")
+    stt = raw.get("stt")
+    if isinstance(stt, dict) and {"english_model", "english_local_path", "auto_model", "auto_local_path"}.intersection(stt):
+        LOGGER.warning(
+            "Deprecated multi-model stt settings are ignored; use the single "
+            "stt.model and stt.local_path settings"
+        )
     config = AppConfig(path=config_path, data=raw)
     config.validate()
     config.ensure_runtime_directories()
