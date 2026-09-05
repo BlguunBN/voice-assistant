@@ -34,6 +34,16 @@ class AutoModel:
         return torch.tensor([[1, self.token_id, 3]])
 
 
+class InternalDetectModel(AutoModel):
+    def detect_language(self, **_kwargs):
+        return torch.tensor([41])
+
+    def generate(self, **kwargs):
+        self.kwargs = kwargs
+        self.detect_language(input_features=kwargs["input_features"])
+        return torch.tensor([[1, 3]])
+
+
 @pytest.mark.parametrize("token_id, expected", [(41, "mn"), (42, "en")])
 def test_auto_detection_uses_language_token_from_single_generation(token_id: int, expected: str):
     engine = STTEngine(load_config(), language="auto")
@@ -48,6 +58,14 @@ def test_auto_rejects_unsupported_detected_language():
     engine._processor, engine._model, engine.loaded = AutoProcessor(), AutoModel(99), True
     with pytest.raises(STTError, match="unsupported language"):
         engine.transcribe(np.zeros(16_000, dtype=np.float32), language="auto")
+
+
+def test_auto_detection_uses_whisper_internal_detection_when_ids_omit_language():
+    engine = STTEngine(load_config(), language="auto")
+    engine._processor, engine._model, engine.loaded = AutoProcessor(), InternalDetectModel(99), True
+
+    assert engine.transcribe(np.zeros(16_000, dtype=np.float32), language="auto") == "test transcript"
+    assert engine.last_detected_language == "mn"
 
 
 def test_desktop_language_defaults_to_auto():

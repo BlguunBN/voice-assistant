@@ -138,11 +138,34 @@ class STTEngine:
         converter = getattr(getattr(self._processor, "tokenizer", None), "convert_ids_to_tokens", None)
         if converter is None:
             return None
-        for token_id in generated_ids[0].tolist():
+        token_ids = generated_ids.flatten().tolist() if hasattr(generated_ids, "flatten") else generated_ids
+        for token_id in token_ids:
             token = str(converter(int(token_id))).strip("<|>").lower()
             if token in _SUPPORTED_LANGUAGES:
                 return token
         return None
+
+    def _generate_with_detected_language(
+        self, model_inputs: Mapping[str, Any], generate_kwargs: Mapping[str, Any]
+    ) -> tuple[Any, str | None]:
+        """Capture Whisper's internal auto-detection without a second forward pass."""
+        detect_language = getattr(self._model, "detect_language", None)
+        if detect_language is None:
+            return self._model.generate(**model_inputs, **generate_kwargs), None
+
+        detected_language: str | None = None
+
+        def capture_detection(*args: Any, **kwargs: Any) -> Any:
+            nonlocal detected_language
+            detected_ids = detect_language(*args, **kwargs)
+            detected_language = self._detected_language_from_ids(detected_ids)
+            return detected_ids
+
+        self._model.detect_language = capture_detection
+        try:
+            return self._model.generate(**model_inputs, **generate_kwargs), detected_language
+        finally:
+            self._model.detect_language = detect_language
 
     def _transcribe_loaded(self, audio: np.ndarray, language: STTLanguage) -> str:
         import torch
@@ -155,13 +178,19 @@ class STTEngine:
         if language in _SUPPORTED_LANGUAGES:
             kwargs["language"] = language
         with torch.inference_mode():
-            generated_ids = self._model.generate(**model_inputs, **kwargs)
+            generated_ids, detected_language = self._generate_with_detected_language(
+                model_inputs, kwargs
+            )
         if self.device == "cuda":
             torch.cuda.synchronize()
         self.last_latency_seconds = time.perf_counter() - started
         self.last_real_time_factor = self.last_latency_seconds / self.last_audio_duration_seconds if self.last_audio_duration_seconds else None
         self.last_peak_vram_bytes = int(torch.cuda.max_memory_allocated()) if self.device == "cuda" else None
-        detected = language if language in _SUPPORTED_LANGUAGES else self._detected_language_from_ids(generated_ids)
+        detected = (
+            language
+            if language in _SUPPORTED_LANGUAGES
+            else detected_language or self._detected_language_from_ids(generated_ids)
+        )
         if language == "auto" and detected not in _SUPPORTED_LANGUAGES:
             raise STTError("Whisper detected an unsupported language; only Mongolian and English are accepted")
         self.last_detected_language = detected
