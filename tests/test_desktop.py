@@ -12,6 +12,7 @@ from src.audio.hotkey import HotkeyError, KeyChord
 from src.core.config import load_config
 from src.desktop.dictation import DesktopDictation, DesktopDictationError, DesktopInstanceLock
 from src.desktop.injector import ClipboardTextInjector
+from src.desktop.preferences import DesktopPreferencesStore
 def test_desktop_hotkey_parses_ctrl_shift_space():
     chord = KeyChord.parse("Ctrl + Shift + Space")
 
@@ -75,6 +76,15 @@ def test_config_exposes_desktop_dictation_defaults():
 
     assert config.desktop_hotkey == "ctrl+alt"
     assert config.desktop_language == "mn"
+
+
+def test_desktop_dictation_uses_the_saved_english_language_preference(tmp_path: Path):
+    engine = object.__new__(DesktopDictation)
+    engine.config = load_config()
+    engine.preferences_store = DesktopPreferencesStore(tmp_path / "desktop-preferences.json")
+    engine.preferences_store.update("en")
+
+    assert engine._selected_language() == "en"
 
 
 def test_desktop_transcribe_posts_multipart_audio(monkeypatch, tmp_path: Path):

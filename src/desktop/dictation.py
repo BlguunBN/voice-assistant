@@ -185,8 +185,8 @@ class DesktopDictation:
         return f"http://{self.config.api_host}:{self.config.api_port}/stt"
 
     def _selected_language(self) -> str:
-        # Desktop dictation is intentionally Mongolian-only.
-        return "mn"
+        store = getattr(self, "preferences_store", None)
+        return store.read().selected_language if store is not None else self.config.desktop_language
 
     def _set_status(
         self,
