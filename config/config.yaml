@@ -10,9 +10,12 @@ storage:
   huggingface_cache: 'huggingface/hub'
 
 stt:
-  # Dedicated Mongolian STT model. All STT requests transcribe as Mongolian.
-  model: 'Blgn94/whisper-small-mn-v3'
-  local_path: 'D:/AI/models/stt/whisper-small-mn-v3'
+  # Models are selected by the requested desktop/API language. Only one is
+  # resident at a time so the application fits comfortably on a 4 GB GPU.
+  mongolian_model: 'orgilj/moonshine-mn'
+  mongolian_local_path: 'models/stt/moonshine-mn'
+  english_model: 'Qwen/Qwen3-ASR-0.6B-hf'
+  english_local_path: 'models/stt/qwen3-asr-0.6b'
   device: cuda
   fallback_device: cpu
   sample_rate: 16000

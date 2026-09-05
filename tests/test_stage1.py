@@ -46,8 +46,10 @@ class FakeModel:
 def test_default_config_resolves_runtime_paths_from_repository_root():
     config = load_config()
 
-    assert config.stt_model_id == "Blgn94/whisper-small-mn-v3"
-    assert config.stt_local_path == Path("D:/AI/models/stt/whisper-small-mn-v3").resolve()
+    assert config.stt_mongolian_model_id == "orgilj/moonshine-mn"
+    assert config.stt_mongolian_local_path == config.project_root / "models" / "stt" / "moonshine-mn"
+    assert config.stt_english_model_id == "Qwen/Qwen3-ASR-0.6B-hf"
+    assert config.stt_english_local_path == config.project_root / "models" / "stt" / "qwen3-asr-0.6b"
     assert config.huggingface_cache == config.project_root / "huggingface" / "hub"
     assert config.stt_sample_rate == 16_000
     assert config.tts_english_device == "cuda"

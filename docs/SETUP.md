@@ -52,13 +52,13 @@ The UI is a Vite development server. It calls the local API and stores device se
 
 ## 5. Download models when needed
 
-The configured Edge TTS provider does not require a local Mongolian TTS model. The single multilingual Whisper model serves every desktop language selection, so download it once:
+The configured Edge TTS provider does not require a local Mongolian TTS model. Download the routed STT models:
 
 ```powershell
 .venv\Scripts\python.exe scripts\download_stt.py
 ```
 
-The legacy `--language mn|en|auto|all` options remain accepted but all select the same `openai/whisper-large-v3-turbo` snapshot at `D:/AI/models/stt/whisper-large-v3-turbo`. Runtime uses FP16 on CUDA when available; CUDA OOM unloads the GPU copy and retries on CPU.
+Use `--language mn`, `--language en`, or the default `--language all` to download Moonshine Mongolian, Qwen English, or both. Runtime loads only the selected language model; CUDA OOM retries on CPU for Qwen.
 
 For the configured local TTS backend only:
 

@@ -11,18 +11,23 @@ sys.path.insert(0, str(ROOT))
 from src.core.config import load_config
 
 
-def _targets(config, _language: str) -> list[tuple[str, Path]]:
-    """Every compatibility option maps to the dedicated Mongolian Whisper download."""
-    return [(config.stt_model_id, config.stt_local_path)]
+def _targets(config, language: str) -> list[tuple[str, Path]]:
+    targets = {
+        "mn": (config.stt_mongolian_model_id, config.stt_mongolian_local_path),
+        "en": (config.stt_english_model_id, config.stt_english_local_path),
+    }
+    if language == "all":
+        return [targets["mn"], targets["en"]]
+    return [targets[language]]
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Download local Whisper STT models")
+    parser = argparse.ArgumentParser(description="Download local Mongolian and English STT models")
     parser.add_argument(
         "--language",
-        choices=("mn", "en", "auto", "all"),
-        default="mn",
-        help="Compatibility option; every choice downloads the Mongolian model",
+        choices=("mn", "en", "all"),
+        default="all",
+        help="Download the selected language model (default: both)",
     )
     args = parser.parse_args()
     config = load_config(ROOT / "config" / "config.yaml")
@@ -34,7 +39,6 @@ def main() -> None:
             repo_id=model_id,
             local_dir=str(model_path),
             cache_dir=str(config.huggingface_cache),
-            allow_patterns=["*.json", "*.txt", "*.safetensors", "*.bin", ".gitattributes"],
             max_workers=4,
         )
         print(location)

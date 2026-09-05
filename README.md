@@ -35,7 +35,7 @@ npm install
 Pop-Location
 ```
 
-Review `config/config.yaml`. The default STT configuration uses one multilingual `openai/whisper-large-v3-turbo` snapshot at `D:/AI/models/stt/whisper-large-v3-turbo`; it serves Mongolian, English, and auto-detect mode without model switching. Download it once when needed:
+Review `config/config.yaml`. The STT setup routes Mongolian to `orgilj/moonshine-mn` and English to `Qwen/Qwen3-ASR-0.6B-hf`. Only the selected model is resident at a time. Download both when needed:
 
 ```powershell
 .venv\Scripts\python.exe scripts\download_stt.py
@@ -43,6 +43,8 @@ Review `config/config.yaml`. The default STT configuration uses one multilingual
 ```
 
 The download scripts read the configured paths. They do not contain machine-specific drive letters.
+
+Use the explicit language selector for reliable routing. Auto mode asks Qwen to identify supported languages and falls back to Moonshine when the result is not English.
 
 Check the installation, then start all three local processes:
 

@@ -49,11 +49,27 @@ class AppConfig:
 
     @property
     def stt_model_id(self) -> str:
-        return str(self.data["stt"]["model"])
+        return self.stt_mongolian_model_id
 
     @property
     def stt_local_path(self) -> Path:
-        return self._path("stt", "local_path")
+        return self.stt_mongolian_local_path
+
+    @property
+    def stt_mongolian_model_id(self) -> str:
+        return str(self.data["stt"]["mongolian_model"])
+
+    @property
+    def stt_mongolian_local_path(self) -> Path:
+        return self._path("stt", "mongolian_local_path")
+
+    @property
+    def stt_english_model_id(self) -> str:
+        return str(self.data["stt"]["english_model"])
+
+    @property
+    def stt_english_local_path(self) -> Path:
+        return self._path("stt", "english_local_path")
 
     @property
     def stt_device(self) -> str:
@@ -293,8 +309,10 @@ class AppConfig:
             raise ConfigError("stt.sample_rate must be 16000 Hz")
         if self.stt_max_new_tokens < 1:
             raise ConfigError("stt.max_new_tokens must be positive")
-        if not self.stt_model_id.strip():
-            raise ConfigError("stt.model must be non-empty")
+        if not self.stt_mongolian_model_id.strip():
+            raise ConfigError("stt.mongolian_model must be non-empty")
+        if not self.stt_english_model_id.strip():
+            raise ConfigError("stt.english_model must be non-empty")
         if not self.tts_model_id.strip():
             raise ConfigError("tts.model must be non-empty")
         if self.tts_provider not in {"local", "edge"}:
@@ -378,11 +396,6 @@ def load_config(path: str | Path | None = None) -> AppConfig:
     if not isinstance(raw, dict):
         raise ConfigError(f"Configuration root must be a mapping: {config_path}")
     stt = raw.get("stt")
-    if isinstance(stt, dict) and {"english_model", "english_local_path", "auto_model", "auto_local_path"}.intersection(stt):
-        LOGGER.warning(
-            "Deprecated multi-model stt settings are ignored; use the single "
-            "stt.model and stt.local_path settings"
-        )
     config = AppConfig(path=config_path, data=raw)
     config.validate()
     config.ensure_runtime_directories()

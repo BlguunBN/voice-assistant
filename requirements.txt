@@ -2,12 +2,13 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 torch==2.11.0+cu128
 torchaudio==2.11.0+cu128
-transformers==4.57.3
+transformers>=5.13,<6
 huggingface-hub==0.36.2
 coqui-tts==0.27.5
 kokoro==0.9.4
 torchcodec==0.16.0
 safetensors>=0.5,<1
+sentencepiece>=0.2,<1
 numpy>=2.0,<3
 PyYAML>=6.0,<7
 soundfile>=0.13,<1

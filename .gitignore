@@ -1,5 +1,6 @@
 .venv/
 models/
+huggingface/
 cache/
 recordings/
 logs/

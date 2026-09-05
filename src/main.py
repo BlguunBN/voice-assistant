@@ -16,7 +16,8 @@ from src.audio import (
 )
 from src.core.config import AppConfig, ConfigError, load_config
 from src.pipeline import EchoPipeline
-from src.stt.engine import STTEngine, STTError
+from src.stt.engine import STTError
+from src.stt.router import STTLanguageRouter
 from src.tts.engine import TTSEngine, TTSError
 
 LOGGER = logging.getLogger(__name__)
@@ -71,13 +72,17 @@ def _print_audio_devices(config: AppConfig) -> tuple[AudioDeviceManager, object,
 
 def print_status(config: AppConfig) -> None:
     torch_version, gpu_name, vram = _torch_status()
-    stt_path = config.stt_local_path
+    mongolian_stt_path = config.stt_mongolian_local_path
+    english_stt_path = config.stt_english_local_path
     tts_path = config.tts_local_path
-    print("STT model")
-    print(f"  repository: {config.stt_model_id}")
-    print(f"  path: {stt_path}")
-    print(f"  installation status: {'installed' if stt_path.is_dir() else 'missing'}")
-    print("  load status: not loaded (start a transcription to load once)")
+    print("STT models")
+    print(f"  Mongolian: {config.stt_mongolian_model_id}")
+    print(f"    path: {mongolian_stt_path}")
+    print(f"    installation: {'installed' if mongolian_stt_path.is_dir() else 'missing'}")
+    print(f"  English: {config.stt_english_model_id}")
+    print(f"    path: {english_stt_path}")
+    print(f"    installation: {'installed' if english_stt_path.is_dir() else 'missing'}")
+    print("  load status: lazy; only the active language model remains resident")
     print(f"  configured device: {config.stt_device}")
     print(f"  fallback device: {config.stt_fallback_device}")
     print("TTS model")
@@ -95,10 +100,10 @@ def print_status(config: AppConfig) -> None:
     _print_audio_devices(config)
 
 
-def transcribe(config: AppConfig, audio_path: str) -> int:
-    engine = STTEngine(config)
+def transcribe(config: AppConfig, audio_path: str, language: str) -> int:
+    engine = STTLanguageRouter(config)
     try:
-        result = engine.transcribe(Path(audio_path))
+        result = engine.transcribe(Path(audio_path), language=language)
         print(result)
         if engine.last_latency_seconds is not None:
             LOGGER.info(
@@ -132,11 +137,11 @@ def speak(config: AppConfig, text: str, speaker_id: str | None, output_path: str
         engine.unload()
 
 
-def _pipeline(config: AppConfig) -> tuple[EchoPipeline, STTEngine, TTSEngine, object, object]:
+def _pipeline(config: AppConfig) -> tuple[EchoPipeline, STTLanguageRouter, TTSEngine, object, object]:
     manager = _audio_manager(config)
     selected_input = manager.selected("input")
     selected_output = manager.selected("output")
-    stt = STTEngine(config)
+    stt = STTLanguageRouter(config)
     tts = TTSEngine(config)
     gate = AudioGate()
     vad = (
@@ -231,6 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     transcribe_parser = subparsers.add_parser("transcribe", help="Transcribe a WAV/audio file")
     transcribe_parser.add_argument("audio", help="Path to the audio file")
+    transcribe_parser.add_argument("--language", choices=("mn", "en", "auto"), default="mn")
 
     speak_parser = subparsers.add_parser("speak", help="Generate and play Mongolian speech")
     speak_parser.add_argument("--speaker", dest="speaker_id", default=None)
@@ -262,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             print_status(config)
             return 0
         if args.command == "transcribe":
-            return transcribe(config, args.audio)
+            return transcribe(config, args.audio, args.language)
         if args.command == "voices":
             return voices(config)
         if args.command == "speak":

@@ -5,38 +5,65 @@ from threading import RLock
 from typing import Literal
 
 from src.core.config import AppConfig
-from .engine import STTEngine
+from .moonshine import MoonshineSTTEngine
+from .qwen import QwenSTTEngine
 
 STTLanguage = Literal["mn", "en", "auto"]
 
 
 class STTLanguageRouter:
-    """Compatibility facade around one dedicated Mongolian STT engine."""
+    """Route Mongolian to Moonshine and English to Qwen, one model at a time."""
 
-    def __init__(self, config: AppConfig, *, engine: STTEngine | None = None) -> None:
-        self._engine = engine or STTEngine(config, language="auto")
+    def __init__(self, config: AppConfig, *, mongolian_engine: object | None = None, english_engine: object | None = None) -> None:
+        self._mongolian = mongolian_engine or MoonshineSTTEngine(config)
+        self._english = english_engine or QwenSTTEngine(config)
+        self._active: object | None = None
         self._lock = RLock()
 
     @property
     def loaded(self) -> bool:
-        return self._engine.loaded
+        return bool(self._active and getattr(self._active, "loaded", False))
 
     @property
     def active_language(self) -> str | None:
-        return self._engine.last_detected_language
+        return getattr(self._active, "last_detected_language", None)
 
     @property
     def detected_language(self) -> str | None:
-        return self._engine.last_detected_language
+        return self.active_language
 
     def load(self) -> None:
         with self._lock:
-            self._engine.load()
+            self._activate(self._mongolian)
 
     def unload(self) -> None:
         with self._lock:
-            self._engine.unload()
+            for engine in (self._mongolian, self._english):
+                engine.unload()
+            self._active = None
+
+    def _activate(self, engine: object) -> None:
+        if self._active is engine:
+            engine.load()
+            return
+        if self._active is not None:
+            self._active.unload()
+        engine.load()
+        self._active = engine
 
     def transcribe(self, audio: str | Path, language: STTLanguage = "mn") -> str:
         with self._lock:
-            return self._engine.transcribe(audio, language=language)
+            if language == "mn":
+                self._activate(self._mongolian)
+                return self._mongolian.transcribe(audio, language="mn")
+            if language == "en":
+                self._activate(self._english)
+                return self._english.transcribe(audio, language="en")
+            # Qwen's language identifier is trustworthy for its supported English
+            # class. Any other result is safely routed to the Mongolian model.
+            self._activate(self._english)
+            english_text = self._english.transcribe(audio, language="auto")
+            if str(getattr(self._english, "last_detected_language", "") or "").lower() == "english":
+                return english_text
+            self._activate(self._mongolian)
+            return self._mongolian.transcribe(audio, language="mn")

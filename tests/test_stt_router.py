@@ -22,19 +22,27 @@ class FakeEngine:
 
     def transcribe(self, _audio: Path, *, language: str) -> str:
         self.languages.append(language)
-        self.last_detected_language = "en" if language == "auto" else language
-        return "Hello" if self.last_detected_language == "en" else "Сайн байна уу"
+        self.last_detected_language = "English" if language == "auto" else language
+        return "Hello" if language in {"en", "auto"} else "Сайн байна уу"
 
 
-def test_router_uses_one_engine_for_every_language_and_keeps_it_resident():
-    engine = FakeEngine()
-    router = STTLanguageRouter(load_config(), engine=engine)
+def test_router_routes_explicit_languages_and_keeps_only_one_engine_resident():
+    mongolian, english = FakeEngine(), FakeEngine()
+    router = STTLanguageRouter(load_config(), mongolian_engine=mongolian, english_engine=english)
     router.load()
     assert router.transcribe("mn.wav", language="mn") == "Сайн байна уу"
     assert router.transcribe("en.wav", language="en") == "Hello"
-    assert router.transcribe("auto.wav", language="auto") == "Hello"
-    assert engine.load_calls == 1
-    assert engine.languages == ["mn", "en", "auto"]
+    assert mongolian.languages == ["mn"]
+    assert english.languages == ["en"]
+    assert mongolian.unload_calls == 1
     assert router.detected_language == "en"
     router.unload()
-    assert engine.unload_calls == 1
+    assert english.unload_calls == 1
+
+
+def test_router_auto_returns_qwen_english_or_falls_back_to_mongolian():
+    mongolian, english = FakeEngine(), FakeEngine()
+    router = STTLanguageRouter(load_config(), mongolian_engine=mongolian, english_engine=english)
+    assert router.transcribe("auto.wav", language="auto") == "Hello"
+    assert english.languages == ["auto"]
+    assert mongolian.languages == []
