@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from threading import RLock
+from typing import Literal
 
 from src.core.config import AppConfig
-from .language import STTLanguage, normalize_detected_language
 from .moonshine import MoonshineSTTEngine
 from .qwen import QwenSTTEngine
+
+STTLanguage = Literal["mn", "en", "auto"]
 
 
 class STTLanguageRouter:
@@ -61,7 +63,7 @@ class STTLanguageRouter:
             # class. Any other result is safely routed to the Mongolian model.
             self._activate(self._english)
             english_text = self._english.transcribe(audio, language="auto")
-            if normalize_detected_language(getattr(self._english, "last_detected_language", None)) == "en":
+            if str(getattr(self._english, "last_detected_language", "") or "").lower() == "en":
                 return english_text
             self._activate(self._mongolian)
             return self._mongolian.transcribe(audio, language="mn")

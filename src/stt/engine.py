@@ -6,15 +6,15 @@ import os
 from copy import copy
 from pathlib import Path
 import time
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 
 import numpy as np
 import soundfile as sf
 
 from src.core.config import AppConfig
-from .language import STTLanguage
 
 LOGGER = logging.getLogger(__name__)
+STTLanguage = Literal["mn", "en", "auto"]
 _SUPPORTED_LANGUAGES = frozenset({"mn", "en"})
 
 

@@ -395,6 +395,7 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         raise ConfigError(f"Invalid YAML in {config_path}: {exc}") from exc
     if not isinstance(raw, dict):
         raise ConfigError(f"Configuration root must be a mapping: {config_path}")
+    stt = raw.get("stt")
     config = AppConfig(path=config_path, data=raw)
     config.validate()
     config.ensure_runtime_directories()

@@ -11,7 +11,6 @@ import soundfile as sf
 
 from src.core.config import AppConfig
 from .engine import STTError
-from .language import normalize_detected_language
 
 
 class QwenSTTEngine:
@@ -127,7 +126,8 @@ class QwenSTTEngine:
             result = str(parsed.get("transcription", "")).strip()
             if not result:
                 raise STTError("English STT returned empty text")
-            self.last_detected_language = normalize_detected_language(parsed.get("language"))
+            detected = str(parsed.get("language") or "").strip().lower()
+            self.last_detected_language = {"english": "en", "mongolian": "mn"}.get(detected, detected or None)
             return result
         except STTError:
             raise

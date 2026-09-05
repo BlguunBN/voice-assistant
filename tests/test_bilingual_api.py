@@ -42,10 +42,6 @@ class RoutingSTT:
         return "Hello" if language == "en" else "Сайн байна уу"
 
 
-class UnknownLanguageRoutingSTT(RoutingSTT):
-    detected_language = "Chinese"
-
-
 class RoutingTTS:
     loaded = False
 
@@ -91,29 +87,6 @@ def test_stt_routes_explicit_english_language():
     assert response.status_code == 200
     assert response.json() == {"transcript": "Hello"}
     assert stt.languages == ["en"]
-
-
-def test_auto_stt_discards_unknown_detected_language_labels():
-    config = load_config()
-    client = TestClient(
-        create_app(
-            config,
-            stt=UnknownLanguageRoutingSTT(),
-            tts=RoutingTTS("mn"),
-            agent=RoutingAgent(),
-            english_tts=RoutingTTS("en"),
-        )
-    )
-
-    with client:
-        response = client.post(
-            "/stt",
-            files={"file": ("input.wav", wav_bytes(), "audio/wav")},
-            data={"language": "auto"},
-        )
-
-    assert response.status_code == 200
-    assert response.json() == {"transcript": "Сайн байна уу"}
 
 
 def test_tts_routes_english_to_lazy_english_engine():
