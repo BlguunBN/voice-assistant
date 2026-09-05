@@ -16,7 +16,7 @@ from src.core.config import AppConfig, load_config
 from src.desktop.preferences import DesktopPreferencesStore
 from src.desktop.status import DesktopStatusStore
 from src.stt import STTError, STTLanguageRouter
-from src.stt.router import STTLanguage
+from src.stt.language import STTLanguage, normalize_detected_language
 from src.tts import EdgeMongolianTTSEngine, EdgeTTSError, EnglishTTSEngine, TTSError, TTSEngine
 
 LOGGER = logging.getLogger(__name__)
@@ -184,7 +184,11 @@ def create_app(
             transcript = transcript.strip()
             if not transcript:
                 raise HTTPException(status_code=422, detail="STT returned an empty transcript")
-            detected_language = getattr(stt_engine, "detected_language", None) if language == "auto" else None
+            detected_language = (
+                normalize_detected_language(getattr(stt_engine, "detected_language", None))
+                if language == "auto"
+                else None
+            )
             return STTResponse(transcript=transcript, detected_language=detected_language)
         except HTTPException:
             raise
